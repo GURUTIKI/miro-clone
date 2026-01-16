@@ -617,7 +617,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                 >
                     <Layer>
                         {shapes.map((shape) => {
-                            const isSelected = selectedIds.includes(shape.id);
+                            // const isSelected = selectedIds.includes(shape.id); // Removed unused
                             return (
                                 <Group
                                     key={shape.id}
@@ -656,12 +656,24 @@ export const Canvas: React.FC<CanvasProps> = ({
                                     }}
                                 >
                                     {renderShape(shape)}
-                                    {isSelected && !isReadOnly && (
-                                        <Transformer ref={transformerRef} rotateEnabled={false} borderStroke="#2196f3" anchorFill="#2196f3" anchorSize={8} />
-                                    )}
                                 </Group>
                             );
                         })}
+                        <Transformer
+                            ref={transformerRef}
+                            rotateEnabled={false}
+                            borderStroke="#2196f3"
+                            anchorFill="#2196f3"
+                            anchorSize={8}
+                            padding={5}
+                            boundBoxFunc={(oldBox, newBox) => {
+                                // Prevent resizing to 0
+                                if (newBox.width < 5 || newBox.height < 5) {
+                                    return oldBox;
+                                }
+                                return newBox;
+                            }}
+                        />
                         {selectionBox && (
                             <Rect
                                 x={selectionBox.width < 0 ? selectionBox.x + selectionBox.width : selectionBox.x}
