@@ -11,7 +11,7 @@ app.use(express.json());
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: "*", // Allow all origins for now (you can restrict this to your Netlify domain later)
     methods: ["GET", "POST"]
   }
 });
@@ -142,7 +142,70 @@ app.post('/upload', (req, res) => {
   });
 });
 
-// ... existing socket.io setup
+// Socket.IO real-time synchronization
 io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+
+  const boardId = socket.handshake.query.boardId as string;
+
+  if (boardId) {
+    socket.join(boardId);
+
+    // Initialize board if it doesn't exist
+    if (!boards[boardId]) {
+      boards[boardId] = {
+        id: boardId,
+        name: `Board ${boardId.slice(0, 8)}`,
+        shapes: []
+      };
+    }
+
+    // Send initial state to the newly connected client
+    socket.emit('init-state', boards[boardId].shapes);
+
+    // Handle shape added
+    socket.on('shape-added', (shape: Shape) => {
+      if (boards[boardId]) {
+        boards[boardId].shapes.push(shape);
+        socket.to(boardId).emit('shape-added', shape);
+      }
+    });
+
+    // Handle shape updated
+    socket.on('shape-updated', (updatedShape: Shape) => {
+      if (boards[boardId]) {
+        const index = boards[boardId].shapes.findIndex(s => s.id === updatedShape.id);
+        if (index !== -1) {
+          boards[boardId].shapes[index] = updatedShape;
+        }
+        socket.to(boardId).emit('shape-updated', updatedShape);
+      }
+    });
+
+    // Handle shape removed
+    socket.on('shape-removed', (shapeId: string) => {
+      if (boards[boardId]) {
+        boards[boardId].shapes = boards[boardId].shapes.filter(s => s.id !== shapeId);
+        socket.to(boardId).emit('shape-removed', shapeId);
+      }
+    });
+
+    // Handle cursor movement
+    socket.on('cursor-move', (cursor: { x: number; y: number }) => {
+      socket.to(boardId).emit('cursor-move', {
+        id: socket.id,
+        x: cursor.x,
+        y: cursor.y,
+        color: '#' + Math.floor(Math.random() * 16777215).toString(16)
+      });
+    });
+  }
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+    if (boardId) {
+      socket.to(boardId).emit('user-disconnected', socket.id);
+    }
+  });
 });
 
