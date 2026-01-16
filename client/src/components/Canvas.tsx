@@ -232,8 +232,8 @@ export const Canvas: React.FC<{ boardId: string }> = ({ boardId }) => {
 
             // Auto-select immediately
             setSelectedIds([id]);
-            setEditingId(tool === 'text' ? id : null); // If text, edit immediately? No wait for mouseup might correspond to drag completion.
-            // Actually user complained dragging text didn't work. Keeping editingId null for now to allow drag.
+            // Removed setEditingId here to allow dragging to define size first. 
+            // setEditingId will be called in handleMouseUp.
         }
     };
 
