@@ -60,17 +60,17 @@ const InPlaceEditor: React.FC<{
                 position: 'fixed',
                 top: ((shape.y + (shape.type === 'artboard' ? -20 : 0)) * scale) + position.y,
                 left: (shape.x * scale) + position.x,
-                width: shape.width * scale,
+                width: (shape.type === 'artboard' ? 300 : shape.width) * scale, // Artboards need more space for labels
                 minHeight: (shape.type === 'artboard' ? 24 : shape.height) * scale,
                 fontSize: (shape.fontSize || (shape.type === 'text' ? 24 : (shape.type === 'artboard' ? 14 : 16))) * scale,
                 fontFamily: shape.fontFamily || 'Inter',
                 fontStyle: shape.fontStyle || 'normal',
                 textDecoration: shape.textDecoration || 'none',
-                color: shape.type === 'text' ? (shape.fill || '#000000') : '#000000',
-                textAlign: (shape.align as any) || (shape.type === 'text' ? 'left' : 'center'),
+                color: shape.type === 'text' ? (shape.fill || '#000000') : '#333333',
+                textAlign: (shape.align as any) || (shape.type === 'text' || shape.type === 'artboard' ? 'left' : 'center'),
                 paddingTop: shape.type === 'sticky' ? (shape.height * scale / 3) : '2px',
-                paddingLeft: shape.type === 'text' ? '0' : '10px',
-                paddingRight: shape.type === 'text' ? '0' : '10px',
+                paddingLeft: (shape.type === 'text' || shape.type === 'artboard') ? '0' : '10px',
+                paddingRight: (shape.type === 'text' || shape.type === 'artboard') ? '0' : '10px',
             }}
             value={localValue}
             autoFocus
@@ -569,14 +569,16 @@ export const Canvas: React.FC<CanvasProps> = ({
                         strokeWidth={1}
                         cornerRadius={4}
                     />
-                    <Text
-                        id={shape.id + '-label'}
-                        text={shape.text || (shape.locked ? "Artboard (Locked)" : "Artboard")}
-                        y={-20}
-                        fontSize={14}
-                        fill={shape.locked ? "#ef4444" : "#999"}
-                        fontStyle={(shape.locked || shape.text) ? "bold" : "normal"}
-                    />
+                    {editingId !== shape.id && (
+                        <Text
+                            id={shape.id + '-label'}
+                            text={shape.text || (shape.locked ? "Artboard (Locked)" : "Artboard")}
+                            y={-20}
+                            fontSize={14}
+                            fill={shape.locked ? "#ef4444" : "#999"}
+                            fontStyle={(shape.locked || shape.text) ? "bold" : "normal"}
+                        />
+                    )}
                     <Group
                         x={shape.width - 24}
                         y={-28}

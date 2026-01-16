@@ -100,9 +100,9 @@ export const Login: React.FC = () => {
                 {/* Logo/Branding */}
                 <div className="text-center mb-8">
                     <div className="inline-block bg-gradient-to-br from-blue-500 to-blue-600 p-4 rounded-2xl shadow-lg mb-4">
-                        <div className="text-white font-bold text-2xl tracking-tight">WB</div>
+                        <div className="text-white font-bold text-2xl tracking-tight">H</div>
                     </div>
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome to Whiteboard</h1>
+                    <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome to Huddleround</h1>
                     <p className="text-gray-600">
                         {isCreating ? 'Create a new company workspace' : 'Enter your company code to get started'}
                     </p>
@@ -178,7 +178,7 @@ export const Login: React.FC = () => {
                                     type="text"
                                     value={companyCode}
                                     onChange={(e) => setCompanyCode(e.target.value.toUpperCase())}
-                                    placeholder="e.g., DEMO2024"
+                                    placeholder="e.g., HUDDLEROUND2024"
                                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors text-lg font-mono"
                                     required
                                     autoFocus
@@ -225,9 +225,6 @@ export const Login: React.FC = () => {
                             >
                                 Create company login
                             </button>
-                            <p className="text-xs text-gray-400 text-center mt-4">
-                                Demo code: <span className="font-mono font-semibold">DEMO2024</span>
-                            </p>
                         </div>
                     )}
                 </div>

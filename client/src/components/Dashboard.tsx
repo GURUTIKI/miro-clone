@@ -133,10 +133,10 @@ export const Dashboard: React.FC = () => {
                         <div className="flex items-center justify-between mb-8">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
-                                    <span className="text-white font-bold text-xl tracking-tight">W</span>
+                                    <span className="text-white font-bold text-xl tracking-tight">H</span>
                                 </div>
                                 <div>
-                                    <span className="text-2xl font-bold text-gray-900 tracking-tight block">Whiteboard</span>
+                                    <span className="text-2xl font-bold text-gray-900 tracking-tight block">Huddleround</span>
                                     <span className="text-sm text-gray-500 font-medium">{company.name}</span>
                                 </div>
                             </div>
