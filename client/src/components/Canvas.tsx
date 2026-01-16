@@ -4,7 +4,6 @@ import useImage from 'use-image';
 import { useBoardStore } from '../store/useBoardStore';
 import type { Shape } from '../store/useBoardStore';
 import { v4 as uuidv4 } from 'uuid';
-import { useSocket } from '../hooks/useSocket';
 import { LogOut, Plus, Minus } from 'lucide-react';
 
 const SCALE_BY = 1.05;
@@ -91,7 +90,24 @@ const InPlaceEditor: React.FC<{
     );
 };
 
-export const Canvas: React.FC<{ boardId: string }> = ({ boardId }) => {
+// Define props interface
+interface CanvasProps {
+    boardId: string;
+    socket: any; // Using any for simplicity as socket type is imported, strict typing preferred: Socket | null
+    emitAddShape: (shape: Shape) => void;
+    emitUpdateShape: (shape: Shape) => void;
+    emitRemoveShape: (id: string) => void;
+    emitCursorMove: (cursor: { x: number; y: number; username?: string }) => void;
+}
+
+export const Canvas: React.FC<CanvasProps> = ({
+    boardId,
+    socket,
+    emitAddShape,
+    emitUpdateShape,
+    emitRemoveShape,
+    emitCursorMove
+}) => {
     const stageRef = useRef<any>(null);
     const transformerRef = useRef<any>(null);
     const [editingId, setEditingId] = React.useState<string | null>(null);
@@ -109,7 +125,8 @@ export const Canvas: React.FC<{ boardId: string }> = ({ boardId }) => {
     const [selectionBox, setSelectionBox] = React.useState<{ x: number, y: number, width: number, height: number } | null>(null);
 
     const { tool, setTool, shapes, cursors, addShape, updateShape, removeShape, selectedIds, setSelectedIds, scale, position, setViewport, activeColor } = useBoardStore();
-    const { emitAddShape, emitUpdateShape, emitCursorMove, emitRemoveShape, socket } = useSocket(boardId);
+    // Socket connection is now handled by parent
+    // const { emitAddShape, emitUpdateShape, emitCursorMove, emitRemoveShape, socket } = useSocket(boardId);
 
     // Check for saved username on mount
     React.useEffect(() => {

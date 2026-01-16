@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import { useRef } from 'react';
 import {
     MousePointer2,
     Type,
@@ -11,8 +11,6 @@ import {
 } from 'lucide-react';
 import { useBoardStore } from '../store/useBoardStore';
 import type { Tool, Shape } from '../store/useBoardStore';
-import { useParams } from 'react-router-dom';
-import { useSocket } from '../hooks/useSocket';
 import { v4 as uuidv4 } from 'uuid';
 
 const tools: { id: Tool; icon: any; label: string }[] = [
@@ -26,29 +24,9 @@ const tools: { id: Tool; icon: any; label: string }[] = [
     { id: 'image', icon: ImageIcon, label: 'Image' },
 ];
 
-export const Toolbar: React.FC = () => {
+export const Toolbar: React.FC<{ emitAddShape: (shape: Shape) => void }> = ({ emitAddShape }) => {
     const { tool, setTool, activeColor, setActiveColor, addShape, setSelectedIds } = useBoardStore();
-    const { boardId } = useParams<{ boardId: string }>();
     const fileInputRef = useRef<HTMLInputElement>(null);
-
-    // Note: useSocket is usually better at page level, but we need emitAddShape here.
-    // Ideally we'd receive emit function as prop, but duplicating hook usage is acceptable for this scale.
-    // Wait, useSocket sets up listeners. If we use it twice (Canvas and Toolbar), we might double listen.
-    // However, if we just want 'emitAddShape', we can get it.
-    // But duplicate listeners might cause double state updates.
-    // Checking hooks/useSocket.ts: it does set up listeners.
-    // Safe approach: Move upload logic to a valid place or just use fetch here and maybe rely on local addShape + emit?
-    // Let's use the hook but be careful. Actually, if boardId is same, socket instance might be shared if implemented that way?
-    // hooks/useSocket.ts creates new socket connection each time. That's bad.
-    // Correct fix: We should ideally refactor to Context. But for now, let's just use `fetch` to upload,
-    // and we need to EMIT the shape.
-    // If we can't emit easily without double-socket, maybe we can just add to local store and let other clients rely on sync?
-    // No, we need to emit.
-    // Let's assume for this task that a second socket connection is an acceptable trade-off or I'll implement a context provider later.
-    // OR: I can pass `onImageUpload` from BoardView -> Toolbar.
-    // But BoardView doesn't have the socket methods directly, Canvas does.
-    // Let's stick to adding useSocket here for now. It will create a second connection. Not ideal but functional.
-    const { emitAddShape } = useSocket(boardId || '');
 
     const COLORS = ['#fff9c4', '#ffccbc', '#b3e5fc', '#c8e6c9', '#f8bbd0', '#d7ccc8'];
 

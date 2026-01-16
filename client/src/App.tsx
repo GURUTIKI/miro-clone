@@ -1,5 +1,6 @@
 import { Canvas } from './components/Canvas';
 import { Toolbar } from './components/Toolbar';
+import { useSocket } from './hooks/useSocket';
 import './index.css';
 
 import React from 'react';
@@ -9,13 +10,21 @@ import { Login } from './components/Login';
 
 const BoardView: React.FC = () => {
   const { boardId } = useParams<{ boardId: string }>();
+  const { emitAddShape, emitUpdateShape, emitRemoveShape, emitCursorMove, socket } = useSocket(boardId || '');
 
   if (!boardId) return <div>Invalid Board ID</div>;
 
   return (
     <div className="w-full h-screen overflow-hidden bg-gray-50 relative">
-      <Toolbar />
-      <Canvas boardId={boardId} />
+      <Toolbar emitAddShape={emitAddShape} />
+      <Canvas
+        boardId={boardId}
+        socket={socket}
+        emitAddShape={emitAddShape}
+        emitUpdateShape={emitUpdateShape}
+        emitRemoveShape={emitRemoveShape}
+        emitCursorMove={emitCursorMove}
+      />
     </div>
   );
 };
