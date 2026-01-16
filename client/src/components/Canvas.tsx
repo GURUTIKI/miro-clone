@@ -1,15 +1,18 @@
 import React, { useRef, useLayoutEffect } from 'react';
-import { Stage, Layer, Rect, Circle, Text, Group, Transformer, Image as KonvaImage, Path, Line } from 'react-konva';
+import { Stage, Layer, Rect, Circle, Text, Group, Transformer, Image as KonvaImage, Line, Path } from 'react-konva';
 import useImage from 'use-image';
 import { useBoardStore } from '../store/useBoardStore';
 import type { Shape } from '../store/useBoardStore';
 import { v4 as uuidv4 } from 'uuid';
-import { LogOut, Plus, Minus } from 'lucide-react';
+import { ArrowLeft, Plus, Minus } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ShareMenu } from './ShareMenu';
+import { Toolbar } from './Toolbar';
 
 const SCALE_BY = 1.05;
 
 const URLImage: React.FC<{ shape: Shape }> = ({ shape }) => {
-    const [image] = useImage(shape.imageUrl || '');
+    const [image] = useImage(shape.imageUrl || '', 'anonymous');
     return (
         <KonvaImage
             image={image}
@@ -40,7 +43,7 @@ const InPlaceEditor: React.FC<{
 
     useLayoutEffect(() => {
         adjustHeight();
-    }, [localValue]); // Adjust height when local text changes
+    }, [localValue]);
 
     const handleCommit = () => {
         const textarea = textareaRef.current;
@@ -60,7 +63,7 @@ const InPlaceEditor: React.FC<{
                 position: 'fixed',
                 top: ((shape.y + (shape.type === 'artboard' ? -20 : 0)) * scale) + position.y,
                 left: (shape.x * scale) + position.x,
-                width: (shape.type === 'artboard' ? 300 : shape.width) * scale, // Artboards need more space for labels
+                width: (shape.type === 'artboard' ? 300 : shape.width) * scale,
                 minHeight: (shape.type === 'artboard' ? 24 : shape.height) * scale,
                 fontSize: (shape.fontSize || (shape.type === 'text' ? 24 : (shape.type === 'artboard' ? 14 : 16))) * scale,
                 fontFamily: shape.fontFamily || 'Inter',
@@ -76,11 +79,9 @@ const InPlaceEditor: React.FC<{
             autoFocus
             onChange={(e) => {
                 setLocalValue(e.target.value);
-                // Height adjustment handled by useLayoutEffect via dependency
             }}
             onBlur={handleCommit}
             onKeyDown={(e) => {
-                // Stop propagation so backspace doesn't delete the shape
                 e.stopPropagation();
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -91,10 +92,9 @@ const InPlaceEditor: React.FC<{
     );
 };
 
-// Define props interface
 interface CanvasProps {
     boardId: string;
-    socket: any; // Using any for simplicity as socket type is imported, strict typing preferred: Socket | null
+    socket: any;
     emitAddShape: (shape: Shape) => void;
     emitUpdateShape: (shape: Shape) => void;
     emitRemoveShape: (id: string) => void;
@@ -111,28 +111,31 @@ export const Canvas: React.FC<CanvasProps> = ({
 }) => {
     const stageRef = useRef<any>(null);
     const transformerRef = useRef<any>(null);
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [editingId, setEditingId] = React.useState<string | null>(null);
     const [spacePressed, setSpacePressed] = React.useState(false);
     const drawingShapeIdRef = React.useRef<string | null>(null);
-
-    // Username modal state
     const [showUsernameModal, setShowUsernameModal] = React.useState(false);
     const [username, setUsername] = React.useState('');
-    const [rememberMe, setRememberMe] = React.useState(false);
     const [tempUsername, setTempUsername] = React.useState('');
     const startPosRef = React.useRef<{ x: number, y: number } | null>(null);
-
     const [selectionBox, setSelectionBox] = React.useState<{ x: number, y: number, width: number, height: number } | null>(null);
 
     const {
         tool, setTool, shapes, cursors, addShape, updateShape, removeShape,
         selectedIds, setSelectedIds, scale, position, setViewport,
-        activeColor, boardName, saveToHistory, undo, redo, copy, paste
+        activeColor, boardName, saveToHistory, undo, redo, copy, paste,
+        isReadOnly, setIsReadOnly, setShareSettings
     } = useBoardStore();
-    // Socket connection is now handled by parent
-    // const { emitAddShape, emitUpdateShape, emitCursorMove, emitRemoveShape, socket } = useSocket(boardId);
 
-    // Check for saved username on mount
+    const emitBoardRename = (newName: string) => {
+        // Optimistic update is already handled by store
+        if (socket) {
+            socket.emit('board-renamed', newName);
+        }
+    };
+
     React.useEffect(() => {
         const savedUsername = localStorage.getItem('miro-username');
         if (savedUsername) {
@@ -143,20 +146,33 @@ export const Canvas: React.FC<CanvasProps> = ({
     }, []);
 
     React.useEffect(() => {
-        const fetchBoardName = async () => {
+        const fetchBoardData = async () => {
             try {
                 const API_URL = import.meta.env.VITE_API_URL || 'https://miro-clone-5oig.onrender.com';
-                const res = await fetch(`${API_URL}/boards/${boardId}`);
+                const token = searchParams.get('token');
+                const res = await fetch(`${API_URL}/boards/${boardId}${token ? `?token=${token}` : ''}`);
                 if (res.ok) {
                     const data = await res.json();
                     useBoardStore.getState().setBoardName(data.name);
+                    useBoardStore.getState().setShareSettings({
+                        isPublic: data.isPublic,
+                        sharePermission: data.sharePermission,
+                        shareToken: data.shareToken
+                    });
+
+                    const isCompanyUser = !!(localStorage.getItem('company') || sessionStorage.getItem('company'));
+                    if (!isCompanyUser) {
+                        if (data.isPublic && data.sharePermission === 'view') {
+                            setIsReadOnly(true);
+                        }
+                    }
                 }
             } catch (error) {
-                console.error('Failed to fetch board name:', error);
+                console.error('Failed to fetch board data:', error);
             }
         };
-        fetchBoardName();
-    }, [boardId]);
+        fetchBoardData();
+    }, [boardId, searchParams, setIsReadOnly, setShareSettings]);
 
     React.useEffect(() => {
         if (transformerRef.current) {
@@ -165,7 +181,6 @@ export const Canvas: React.FC<CanvasProps> = ({
                 .map(id => {
                     const node = stage.findOne('#' + id);
                     if (!node) return null;
-                    // Skip transformer nodes for pen tool
                     const shape = shapes.find(s => s.id === id);
                     if (shape?.type === 'pen') return null;
                     return node;
@@ -184,15 +199,11 @@ export const Canvas: React.FC<CanvasProps> = ({
 
     React.useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Delete / Backspace
+            if (isReadOnly) return;
             if ((e.key === 'Backspace' || e.key === 'Delete')) {
-                // If editing text, do not delete shapes
                 if (editingId) return;
-
                 if (selectedIds.length > 0) {
-                    e.preventDefault(); // Prevent browser back navigation
-                    console.log('Deleting shapes:', selectedIds);
-
+                    e.preventDefault();
                     const toRemove = selectedIds.filter(id => {
                         const s = shapes.find(shape => shape.id === id);
                         return !s?.locked;
@@ -209,7 +220,6 @@ export const Canvas: React.FC<CanvasProps> = ({
                 }
             }
 
-            // Undo (Cmd+Z / Ctrl+Z)
             if (e.key === 'z' && (e.metaKey || e.ctrlKey)) {
                 if (editingId) return;
                 e.preventDefault();
@@ -217,16 +227,13 @@ export const Canvas: React.FC<CanvasProps> = ({
                 else undo();
             }
 
-            // Copy (Cmd+C / Ctrl+C)
             if (e.key === 'c' && (e.metaKey || e.ctrlKey)) {
                 if (editingId) return;
                 copy();
             }
 
-            // Paste (Cmd+V / Ctrl+V)
             if (e.key === 'v' && (e.metaKey || e.ctrlKey)) {
                 if (editingId) return;
-                // Get pointer position for paste
                 const stage = stageRef.current;
                 if (stage) {
                     const sc = stage.scaleX();
@@ -241,7 +248,6 @@ export const Canvas: React.FC<CanvasProps> = ({
                 }
             }
 
-            // Space for Panning
             if (e.code === 'Space' && !editingId && tool !== 'text') {
                 if (!spacePressed) {
                     setSpacePressed(true);
@@ -261,16 +267,13 @@ export const Canvas: React.FC<CanvasProps> = ({
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
         };
-    }, [selectedIds, editingId, removeShape, emitRemoveShape, setSelectedIds, tool, shapes, saveToHistory, undo, redo, copy, paste, spacePressed]);
+    }, [selectedIds, editingId, removeShape, emitRemoveShape, setSelectedIds, tool, shapes, saveToHistory, undo, redo, copy, paste, spacePressed, isReadOnly, emitAddShape]);
 
     const handleMouseDown = (e: any) => {
-        // If clicking on empty space
+        if (isReadOnly) return;
         if (e.target === e.target.getStage()) {
-            // Pointer tool + not panning (no spacebar) = Box Selection
             if (tool === 'select' && !spacePressed) {
-                // Clear selection unless Shift is held (can implement shift later, for now clear)
                 setSelectedIds([]);
-
                 const stage = stageRef.current;
                 const sc = stage.scaleX();
                 const pos = stage.position();
@@ -283,15 +286,13 @@ export const Canvas: React.FC<CanvasProps> = ({
                 return;
             }
 
-            // Start drawing (if valid tool)
-            // If Hand tool or Panning, do nothing (dragging handles pan).
             if (tool === 'hand' || spacePressed) return;
 
             const stage = stageRef.current;
             const sc = stage.scaleX();
-            const pos = stage.getPointerPosition(); // Use getPointerPosition for drawing start
-            const x = (pos.x - stage.x()) / sc;
-            const y = (pos.y - stage.y()) / sc;
+            const pointer = stage.getPointerPosition();
+            const x = (pointer.x - stage.x()) / sc;
+            const y = (pointer.y - stage.y()) / sc;
 
             const id = uuidv4();
             drawingShapeIdRef.current = id;
@@ -299,7 +300,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             if (['rectangle', 'circle', 'artboard', 'sticky', 'text', 'image'].includes(tool)) {
                 const newShape: Shape = {
                     id,
-                    type: tool,
+                    type: tool as any,
                     x,
                     y,
                     width: 5,
@@ -312,14 +313,13 @@ export const Canvas: React.FC<CanvasProps> = ({
 
                 addShape(newShape);
                 emitAddShape(newShape);
-                drawingShapeIdRef.current = id;
                 startPosRef.current = { x, y };
                 setSelectedIds([id]);
             } else if (tool === 'pen') {
                 const newShape: Shape = {
                     id,
                     type: 'pen',
-                    x: 0, // Pen tool coordinates are absolute within its points array
+                    x: 0,
                     y: 0,
                     width: 0,
                     height: 0,
@@ -331,7 +331,6 @@ export const Canvas: React.FC<CanvasProps> = ({
 
                 addShape(newShape);
                 emitAddShape(newShape);
-                drawingShapeIdRef.current = id;
                 startPosRef.current = { x, y };
                 setSelectedIds([id]);
             }
@@ -341,7 +340,6 @@ export const Canvas: React.FC<CanvasProps> = ({
     const handleMouseMove = (e: any) => {
         const stage = e.target.getStage();
         const pointer = stage.getPointerPosition();
-
         if (!pointer) return;
 
         const sc = stage.scaleX();
@@ -352,7 +350,8 @@ export const Canvas: React.FC<CanvasProps> = ({
 
         emitCursorMove({ x: pos.x, y: pos.y, username });
 
-        // Handle Box Selection
+        if (isReadOnly) return;
+
         if (tool === 'select' && !spacePressed && startPosRef.current && !drawingShapeIdRef.current) {
             const startX = startPosRef.current.x;
             const startY = startPosRef.current.y;
@@ -363,7 +362,6 @@ export const Canvas: React.FC<CanvasProps> = ({
             return;
         }
 
-        // Handle drawing resize or pen drawing
         if (drawingShapeIdRef.current && startPosRef.current) {
             const shape = shapes.find(s => s.id === drawingShapeIdRef.current);
             if (!shape) return;
@@ -376,7 +374,6 @@ export const Canvas: React.FC<CanvasProps> = ({
             } else {
                 const startX = startPosRef.current.x;
                 const startY = startPosRef.current.y;
-
                 const width = pos.x - startX;
                 const height = pos.y - startY;
 
@@ -395,23 +392,20 @@ export const Canvas: React.FC<CanvasProps> = ({
     };
 
     const handleMouseUp = () => {
-        // End box selection
+        if (isReadOnly) return;
         if (selectionBox) {
             const box = selectionBox;
-            // Normalize box
             const x = box.width < 0 ? box.x + box.width : box.x;
             const y = box.height < 0 ? box.y + box.height : box.y;
             const w = Math.abs(box.width);
             const h = Math.abs(box.height);
 
-            // Find overlapping shapes
             const foundIds = shapes.filter(shape => {
                 let sX = shape.x;
                 let sY = shape.y;
                 let sW = shape.width;
                 let sH = shape.height;
 
-                // For pen tools, we calculate the bounding box from points
                 if (shape.type === 'pen' && shape.points) {
                     const pts = shape.points;
                     let minX = pts[0], maxX = pts[0], minY = pts[1], maxY = pts[1];
@@ -427,13 +421,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     sH = maxY - minY;
                 }
 
-                // AABB intersection
-                return (
-                    x < sX + sW &&
-                    x + w > sX &&
-                    y < sY + sH &&
-                    y + h > sY
-                );
+                return (x < sX + sW && x + w > sX && y < sY + sH && y + h > sY);
             }).map(s => s.id);
 
             setSelectedIds(foundIds);
@@ -443,45 +431,33 @@ export const Canvas: React.FC<CanvasProps> = ({
         }
 
         if (drawingShapeIdRef.current) {
-            // Default size enforcement if too small (single click creation)
             const shape = shapes.find(s => s.id === drawingShapeIdRef.current);
             if (shape) {
-                // Minimum size enforcement
                 const isText = tool === 'text';
-                const defaultSize = tool === 'sticky' || tool === 'artboard' ? 150 : (isText ? 100 : 100);
-
-                // If text, drag might define width, but height is auto-calculated usually
-                // For now, let's just respect the dragged width for text too
+                const defaultSize = tool === 'sticky' || tool === 'artboard' ? 150 : 100;
 
                 const updated = {
                     ...shape,
-                    width: shape.width < 50 ? defaultSize : shape.width,
+                    width: shape.width < 50 ? (isText ? shape.width : defaultSize) : shape.width,
                     height: shape.height < 20 ? (isText ? shape.height : defaultSize) : shape.height
                 };
                 updateShape(shape.id, updated);
                 emitUpdateShape(updated);
-                saveToHistory(); // Save after creation/resize is finalized
+                saveToHistory();
 
-                // If text was created, enter edit mode
                 if (isText) {
                     setEditingId(shape.id);
                 }
             }
-
             drawingShapeIdRef.current = null;
             startPosRef.current = null;
         }
     };
 
-    // Auto-switch to pointer when clicking an object
-    // We can handle this by wrapping the shape onClick
     const handleShapeClick = (id: string, e: any) => {
         e.cancelBubble = true;
+        if (isReadOnly) return;
         if (tool !== 'select' && tool !== 'hand' && !spacePressed) {
-            // If we are using a tool (like rect), clicking an existing shape usually shouldn't select it 
-            // unless we want to replace it? 
-            // But user request "if i click on something ... automatically goes to pointer tool"
-            // implies they want to select it.
             setTool('select');
         }
         setSelectedIds([id]);
@@ -501,7 +477,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         };
 
         const newScale = e.evt.deltaY < 0 ? oldScale * SCALE_BY : oldScale / SCALE_BY;
-
         const newPos = {
             x: pointer.x - mousePointTo.x * newScale,
             y: pointer.y - mousePointTo.y * newScale,
@@ -510,54 +485,26 @@ export const Canvas: React.FC<CanvasProps> = ({
         setViewport(newScale, newPos);
     };
 
-    const handleStageClick = () => {
-        // Only handle clearing selection here if we didn't just draw
-        // Note: mouseup fires before click
-        // We can probably remove most logic from here as mousedown handles creation now
-    };
-
     const handleStageDblClick = (e: any) => {
-        // Check if we clicked on a shape
+        if (isReadOnly) return;
         if (e.target !== e.target.getStage()) {
             let clickedNode = e.target;
-            console.log('Stage Double Click on:', clickedNode.className, clickedNode.id());
-
-            // The shape ID might be on the group (parent) or the node itself
             let shapeId = clickedNode.id();
-
-            // Handle artboard labels which have "-label" suffix
-            if (shapeId && shapeId.endsWith('-label')) {
-                shapeId = shapeId.replace('-label', '');
-            }
-
+            if (shapeId && shapeId.endsWith('-label')) shapeId = shapeId.replace('-label', '');
             if (!shapeId && clickedNode.getParent()) {
                 shapeId = clickedNode.getParent().id();
-                if (shapeId && shapeId.endsWith('-label')) {
-                    shapeId = shapeId.replace('-label', '');
-                }
+                if (shapeId && shapeId.endsWith('-label')) shapeId = shapeId.replace('-label', '');
             }
-
-            console.log('Resolved Shape ID:', shapeId);
 
             const shape = shapes.find(s => s.id === shapeId);
-            if (shape) {
-                console.log('Found Shape:', shape.type);
-                if (shape.type === 'text' || shape.type === 'sticky' || shape.type === 'artboard') {
-                    console.log('Setting editingId');
-                    setEditingId(shapeId);
-                }
-            } else {
-                console.log('Shape not found in store');
+            if (shape && (shape.type === 'text' || shape.type === 'sticky' || shape.type === 'artboard')) {
+                setEditingId(shapeId);
             }
-        } else {
-            console.log('Clicked on stage directly');
         }
     };
-    const renderShape = (shape: Shape) => {
-        if (shape.type === 'image') {
-            return <URLImage shape={shape} />;
-        }
 
+    const renderShape = (shape: Shape) => {
+        if (shape.type === 'image') return <URLImage shape={shape} />;
         if (shape.type === 'artboard') {
             return (
                 <>
@@ -584,16 +531,12 @@ export const Canvas: React.FC<CanvasProps> = ({
                         y={-28}
                         onClick={(e) => {
                             e.cancelBubble = true;
+                            if (isReadOnly) return;
                             useBoardStore.getState().toggleLock(shape.id);
                         }}
                     >
                         <Rect width={24} height={24} fill="transparent" />
-                        <Text
-                            text={shape.locked ? "🔒" : "🔓"}
-                            fontSize={16}
-                            align="center"
-                            verticalAlign="middle"
-                        />
+                        <Text text={shape.locked ? "🔒" : "🔓"} fontSize={16} align="center" verticalAlign="middle" />
                     </Group>
                 </>
             );
@@ -611,14 +554,10 @@ export const Canvas: React.FC<CanvasProps> = ({
                     {shape.text && editingId !== shape.id && (
                         <Text
                             text={shape.text}
-                            textDecoration={shape.textDecoration}
-                            fontFamily={shape.fontFamily}
-                            fontStyle={shape.fontStyle}
                             align={shape.align || 'center'}
-                            width={shape.width} // Text needs width to wrap
-                            fill="#333" // Fix: Always use dark text for sticky notes/rects
+                            width={shape.width}
+                            fill="#333"
                             wrap="word"
-                            ellipsis={true}
                             height={shape.height}
                             padding={10}
                             verticalAlign="middle"
@@ -627,44 +566,21 @@ export const Canvas: React.FC<CanvasProps> = ({
                 </>
             );
         }
-
-        if (shape.type === 'circle') {
-            return (
-                <Circle
-                    radius={shape.width / 2}
-                    fill={shape.fill}
-                />
-            );
-        }
-
+        if (shape.type === 'circle') return <Circle radius={shape.width / 2} fill={shape.fill} />;
         if (shape.type === 'text') {
             return (
                 <Text
                     text={editingId === shape.id ? '' : (shape.text || 'Type something...')}
                     fontSize={shape.fontSize || 24}
-                    fontFamily={shape.fontFamily || 'Inter'}
-                    fontStyle={shape.fontStyle || 'normal'}
-                    textDecoration={shape.textDecoration || 'none'}
                     fill={shape.fill || '#333'}
                     width={shape.width}
                     align={shape.align || 'left'}
                 />
-            )
-        }
-
-        if (shape.type === 'pen') {
-            return (
-                <Line
-                    points={shape.points || []}
-                    stroke={shape.stroke || '#000'}
-                    strokeWidth={shape.strokeWidth || 3}
-                    tension={0.5}
-                    lineCap="round"
-                    lineJoin="round"
-                />
             );
         }
-
+        if (shape.type === 'pen') {
+            return <Line points={shape.points || []} stroke={shape.stroke || '#000'} strokeWidth={shape.strokeWidth || 3} tension={0.5} lineCap="round" lineJoin="round" />;
+        }
         return null;
     };
 
@@ -673,8 +589,8 @@ export const Canvas: React.FC<CanvasProps> = ({
             <div
                 className="fixed inset-0 w-full h-full overflow-hidden canvas-grid"
                 style={{
-                    backgroundSize: `${20 * scale}px ${20 * scale} px`,
-                    backgroundPosition: `${position.x}px ${position.y} px`,
+                    backgroundSize: `${20 * scale}px ${20 * scale}px`,
+                    backgroundPosition: `${position.x}px ${position.y}px`,
                     cursor: tool === 'hand' || spacePressed ? 'grab' : (tool === 'select' ? 'default' : 'crosshair')
                 }}
             >
@@ -689,7 +605,6 @@ export const Canvas: React.FC<CanvasProps> = ({
                     onWheel={handleWheel}
                     onMouseDown={handleMouseDown}
                     onMouseUp={handleMouseUp}
-                    onClick={handleStageClick}
                     onDblClick={handleStageDblClick}
                     onMouseMove={handleMouseMove}
                     draggable={(tool === 'hand' || spacePressed) && !drawingShapeIdRef.current && !selectionBox}
@@ -700,380 +615,161 @@ export const Canvas: React.FC<CanvasProps> = ({
                     }}
                 >
                     <Layer>
-                        {/* Background is now handled by CSS grid pattern */}
                         {shapes.map((shape) => {
                             const isSelected = selectedIds.includes(shape.id);
                             return (
                                 <Group
                                     key={shape.id}
                                     id={shape.id}
-                                    x={shape.type === 'pen' ? 0 : shape.x} // Pen tool handles its own coordinates
-                                    y={shape.type === 'pen' ? 0 : shape.y} // Pen tool handles its own coordinates
-                                    draggable={(tool === 'select' && !spacePressed) || (tool === 'hand' && false)} // Only draggable in select mode
+                                    x={shape.type === 'pen' ? 0 : shape.x}
+                                    y={shape.type === 'pen' ? 0 : shape.y}
+                                    draggable={!isReadOnly && tool === 'select' && !spacePressed}
                                     onClick={(e) => handleShapeClick(shape.id, e)}
                                     onDragStart={(e: any) => {
-                                        if (shape.locked) {
+                                        if (shape.locked || isReadOnly) {
                                             e.target.stopDrag();
                                             return;
                                         }
-                                        // If not already selected, select it (exclusive)
-                                        if (!selectedIds.includes(shape.id)) {
-                                            setSelectedIds([shape.id]);
-                                        }
-                                        if (tool !== 'select') setTool('select'); // Auto-switch on drag too
+                                        if (!selectedIds.includes(shape.id)) setSelectedIds([shape.id]);
+                                        if (tool !== 'select') setTool('select');
                                     }}
                                     onDragEnd={(e: any) => {
-                                        if (shape.locked) return;
-                                        const updated = {
-                                            ...shape,
-                                            x: e.target.x(),
-                                            y: e.target.y(),
-                                        };
+                                        if (shape.locked || isReadOnly) return;
+                                        const updated = { ...shape, x: e.target.x(), y: e.target.y() };
                                         saveToHistory();
                                         updateShape(shape.id, updated);
                                         emitUpdateShape(updated);
                                     }}
                                     onTransformEnd={(e: any) => {
+                                        if (isReadOnly) return;
                                         const node = e.target;
                                         const scaleX = node.scaleX();
                                         const scaleY = node.scaleY();
-
-                                        // Reset scale to 1
-                                        node.scaleX(1);
-                                        node.scaleY(1);
-
-                                        // For Groups (sticky notes, rectangles), we need to get the actual shape dimensions
-                                        // The group itself might have width/height of 0
-                                        let baseWidth = shape.width;
-                                        let baseHeight = shape.height;
-
-                                        // Calculate new width/height based on the scale applied
-                                        let newWidth = baseWidth * scaleX;
-                                        let newHeight = baseHeight * scaleY;
-                                        let newX = node.x();
-                                        let newY = node.y();
-
-                                        // Handle horizontal flipping
-                                        if (newWidth < 0) {
-                                            newX += newWidth;
-                                            newWidth = Math.abs(newWidth);
-                                        }
-
-                                        // Handle vertical flipping
-                                        if (newHeight < 0) {
-                                            newY += newHeight;
-                                            newHeight = Math.abs(newHeight);
-                                        }
-
-                                        // Enforce minimum size
-                                        newWidth = Math.max(20, newWidth);
-                                        newHeight = Math.max(20, newHeight);
-
-                                        const updated = {
-                                            ...shape,
-                                            x: newX,
-                                            y: newY,
-                                            width: newWidth,
-                                            height: newHeight,
-                                        };
-
+                                        node.scaleX(1); node.scaleY(1);
+                                        let newWidth = Math.max(20, shape.width * scaleX);
+                                        let newHeight = Math.max(20, shape.height * scaleY);
+                                        const updated = { ...shape, x: node.x(), y: node.y(), width: newWidth, height: newHeight };
                                         saveToHistory();
                                         updateShape(shape.id, updated);
                                         emitUpdateShape(updated);
                                     }}
-                                    onContextMenu={(e: any) => {
-                                        e.evt.preventDefault();
-                                        if (confirm('Delete this shape?')) {
-                                            saveToHistory();
-                                            removeShape(shape.id);
-                                            emitRemoveShape(shape.id);
-                                            setSelectedIds([]);
-                                        }
-                                    }}
-                                    stroke={(isSelected && shape.type !== 'pen') ? (shape.locked ? '#ef4444' : '#2196f3') : 'transparent'}
-                                    strokeWidth={2}
                                 >
                                     {renderShape(shape)}
+                                    {isSelected && !isReadOnly && (
+                                        <Transformer ref={transformerRef} rotateEnabled={false} borderStroke="#2196f3" anchorFill="#2196f3" anchorSize={8} />
+                                    )}
                                 </Group>
                             );
                         })}
-
-                        {/* Render multiplayer cursors */}
-                        {Object.values(cursors)
-                            .filter(cursor => cursor.id !== socket?.id && cursor.id !== 'undefined') // Filter out self and invalid IDs
-                            .map((cursor) => (
-                                <Group key={cursor.id} x={cursor.x} y={cursor.y}>
-                                    {/* Cursor Pointer (Navigation Arrow matching local style) */}
-                                    <Path
-                                        data="M6 3L13 22L17 14L25 11L6 3Z"
-                                        fill={cursor.color}
-                                        stroke="white"
-                                        strokeWidth={2}
-                                        lineJoin="round"
-                                        lineCap="round"
-                                        shadowColor="black"
-                                        shadowBlur={4}
-                                        shadowOpacity={0.2}
-                                        shadowOffset={{ x: 2, y: 2 }}
-                                    />
-
-                                    {/* User Name Label */}
-                                    <Text
-                                        text={cursor.username || cursor.id.slice(0, 8)}
-                                        fontSize={14}
-                                        fill={cursor.color}
-                                        fontStyle="bold"
-                                        x={28}
-                                        y={18}
-                                        align="left"
-                                        verticalAlign="middle"
-                                        shadowColor="white"
-                                        shadowBlur={0}
-                                        shadowOffset={{ x: 1, y: 1 }}
-                                        shadowOpacity={1}
-                                    />
-                                </Group>
-                            ))}
-
-                        {/* Selection Box Render */}
                         {selectionBox && (
                             <Rect
-                                x={selectionBox.x}
-                                y={selectionBox.y}
-                                width={selectionBox.width}
-                                height={selectionBox.height}
-                                fill="rgba(33, 150, 243, 0.2)"
+                                x={selectionBox.width < 0 ? selectionBox.x + selectionBox.width : selectionBox.x}
+                                y={selectionBox.height < 0 ? selectionBox.y + selectionBox.height : selectionBox.y}
+                                width={Math.abs(selectionBox.width)}
+                                height={Math.abs(selectionBox.height)}
+                                fill="rgba(33, 150, 243, 0.1)"
                                 stroke="#2196f3"
                                 strokeWidth={1}
                             />
                         )}
-
-                        {selectedIds.length > 0 && <Transformer ref={transformerRef} />}
+                        {Object.values(cursors).map((cursor) => (
+                            <Group key={cursor.id} x={cursor.x} y={cursor.y}>
+                                <Path data="M0,0 L0,15 L4,11 L8,11 Z" fill={cursor.color} stroke="white" strokeWidth={1} />
+                                {cursor.username && (
+                                    <Text text={cursor.username} y={20} fill={cursor.color} fontSize={12} fontStyle="bold" />
+                                )}
+                            </Group>
+                        ))}
                     </Layer>
                 </Stage>
-
-                {editingId && shapes.find(s => s.id === editingId) && (
-                    <InPlaceEditor
-                        shape={shapes.find(s => s.id === editingId)!}
-                        scale={scale}
-                        position={position}
-                        onBlur={() => setEditingId(null)}
-                        onUpdate={(text, height) => {
-                            const shape = shapes.find(s => s.id === editingId)!;
-                            const updated = {
-                                ...shape,
-                                text,
-                                height: Math.max(shape.height, height)
-                            };
-                            updateShape(editingId, updated);
-                            emitUpdateShape(updated);
-                        }}
-                    />
-                )}
             </div>
 
-            {/* Top Bar Overlay */}
-            <div className="fixed top-0 left-0 right-0 h-16 pointer-events-none z-50 flex items-center justify-between px-6 pt-3">
-                {/* Left: Branding & Board Info */}
-                <div className="pointer-events-auto flex items-center gap-3 bg-[var(--bg-toolbar)] backdrop-blur-xl px-4 py-2.5 rounded-xl shadow-md border border-[var(--border-ui)] hover:shadow-lg transition-shadow">
-                    <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-2 rounded-lg text-white font-bold text-xs tracking-tight shadow-sm">
-                        WB
-                    </div>
-                    <div className="h-5 w-px bg-[var(--border-ui)]"></div>
-                    <div>
-                        <h1 className="font-semibold text-[var(--text-primary)] text-sm leading-tight">{boardName || `Board ${boardId.slice(0, 8)} `}</h1>
-                        <p className="text-[10px] text-[var(--text-secondary)] font-medium">Saved just now</p>
-                    </div>
+            {/* Editing Text Overlay */}
+            {editingId && shapes.find(s => s.id === editingId) && (
+                <InPlaceEditor
+                    shape={shapes.find(s => s.id === editingId)!}
+                    scale={scale}
+                    position={position}
+                    onUpdate={(text, height) => {
+                        const updated = { ...shapes.find(s => s.id === editingId)!, text, height };
+                        updateShape(editingId, updated);
+                        emitUpdateShape(updated);
+                    }}
+                    onBlur={() => setEditingId(null)}
+                />
+            )}
+
+            {/* Top Bar - Left: Board Name */}
+            <div className="fixed top-6 left-6 flex items-center gap-3 z-50 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm p-1.5 pr-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all hover:shadow-md">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-500/20">H</div>
+                <div className="flex flex-col">
+                    <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider leading-none mb-0.5">Board</span>
+                    <h1 className="text-sm font-bold text-gray-800 dark:text-white leading-none">{boardName || 'Untitled Board'}</h1>
                 </div>
+            </div>
 
-                {/* Right: Actions */}
-                <div className="pointer-events-auto flex items-center gap-2">
+            {/* Toolbar */}
+            {!isReadOnly && (
+                <Toolbar
+                    emitAddShape={emitAddShape}
+                    emitBoardRename={emitBoardRename}
+                />
+            )}
 
-                    {/* Active Users List */}
-                    <div className="flex items-center -space-x-2 mr-2">
-                        {Object.values(cursors).slice(0, 3).map((cursor) => (
-                            <div
-                                key={cursor.id}
-                                className="w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-white text-[10px] font-bold shadow-sm"
-                                style={{ backgroundColor: cursor.color }}
-                                title={cursor.username || cursor.id}
-                            >
-                                {(cursor.username || cursor.id).slice(0, 2).toUpperCase()}
-                            </div>
-                        ))}
-                        {Object.values(cursors).length > 3 && (
-                            <div className="w-8 h-8 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-gray-600 text-[10px] font-bold shadow-sm">
-                                +{Object.values(cursors).length - 3}
-                            </div>
-                        )}
-
-                        {/* Current User Avatar */}
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 border-2 border-white shadow-md cursor-pointer hover:shadow-lg hover:scale-105 transition-all flex items-center justify-center text-white text-xs font-bold z-10">
-                            {username ? username.slice(0, 2).toUpperCase() : 'ME'}
-                        </div>
-                    </div>
-
-                    {/* Separator */}
-                    <div className="h-8 w-px bg-[var(--border-ui)] mx-1"></div>
-
-                    {/* Exit Board */}
+            {/* Controls Overlay */}
+            <div className="fixed top-6 right-6 flex flex-col items-end gap-3 z-50">
+                <div className="flex items-center gap-2">
+                    <ShareMenu boardId={boardId} stageRef={stageRef} boardName={boardName} />
                     <button
-                        onClick={() => window.location.href = '/'}
-                        className="bg-[var(--bg-toolbar)] hover:bg-opacity-90 text-[var(--text-primary)] px-4 py-2.5 rounded-lg border border-[var(--border-ui)] shadow-sm text-sm font-medium transition-all hover:border-blue-500/50 flex items-center gap-2"
+                        onClick={() => navigate('/dashboard')}
                         title="Exit Board"
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl font-bold border border-gray-100 dark:border-gray-700 shadow-sm transition-all text-sm group"
                     >
-                        <LogOut size={16} strokeWidth={2} />
+                        <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
                         Exit
                     </button>
                 </div>
-            </div>
 
-            {/* Zoom Controls (Bottom Right) */}
-            <div className="fixed bottom-6 right-6 flex flex-col gap-2 pointer-events-auto shadow-lg bg-[var(--bg-toolbar)] backdrop-blur-xl rounded-lg p-1 border border-[var(--border-ui)]">
-                <button
-                    className="p-2 hover:bg-[var(--bg-canvas)] text-[var(--text-primary)] rounded transition-colors"
-                    onClick={() => {
-                        const newScale = scale * 1.2;
-                        setViewport(newScale, position);
-                    }}
-                    title="Zoom In"
-                >
-                    <Plus size={20} />
-                </button>
-                <div className="h-px bg-[var(--border-ui)] mx-2"></div>
-                <button
-                    className="p-2 hover:bg-[var(--bg-canvas)] text-[var(--text-primary)] rounded transition-colors"
-                    onClick={() => {
-                        const newScale = scale / 1.2;
-                        setViewport(newScale, position);
-                    }}
-                    title="Zoom Out"
-                >
-                    <Minus size={20} />
-                </button>
+                <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-1.5 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                    <button onClick={() => setViewport(scale / SCALE_BY, position)} className="p-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg text-gray-500 transition-colors"><Minus size={16} /></button>
+                    <span className="text-xs font-bold text-gray-600 dark:text-gray-400 min-w-[40px] text-center">{Math.round(scale * 100)}%</span>
+                    <button onClick={() => setViewport(scale * SCALE_BY, position)} className="p-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg text-gray-500 transition-colors"><Plus size={16} /></button>
+                </div>
             </div>
 
             {/* Username Modal */}
             {showUsernameModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full animate-fade-in">
-                        <h2 className="text-2xl font-bold text-gray-900 mb-2">Hi, who's there?!</h2>
-                        <p className="text-gray-600 mb-6">Let others know who you are</p>
-
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 w-full max-w-md shadow-2xl border border-white/20 animate-scale-up">
+                        <div className="text-center mb-8">
+                            <div className="w-16 h-16 bg-blue-500 rounded-2xl flex items-center justify-center text-white text-3xl font-black mx-auto mb-4 shadow-lg">H</div>
+                            <h2 className="text-2xl font-black text-gray-900 dark:text-white">What's your name?</h2>
+                            <p className="text-gray-500 mt-2">Others on the board will see this.</p>
+                        </div>
                         <input
                             type="text"
+                            placeholder="Your name"
                             value={tempUsername}
                             onChange={(e) => setTempUsername(e.target.value)}
-                            placeholder="Enter your name..."
-                            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors mb-4 text-lg"
+                            className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-900 border-2 border-gray-100 dark:border-gray-700 rounded-2xl mb-6 focus:border-blue-500 focus:outline-none transition-all text-lg font-medium dark:text-white"
                             autoFocus
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && tempUsername.trim()) {
-                                    const finalUsername = tempUsername.trim();
-                                    setUsername(finalUsername);
-                                    if (rememberMe) {
-                                        localStorage.setItem('miro-username', finalUsername);
-                                    }
-                                    setShowUsernameModal(false);
-                                }
-                            }}
                         />
-
-                        <label className="flex items-center gap-2 mb-6 cursor-pointer group">
-                            <input
-                                type="checkbox"
-                                checked={rememberMe}
-                                onChange={(e) => setRememberMe(e.target.checked)}
-                                className="w-5 h-5 rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                            />
-                            <span className="text-gray-700 group-hover:text-gray-900 transition-colors">Remember me</span>
-                        </label>
-
                         <button
                             onClick={() => {
                                 if (tempUsername.trim()) {
-                                    const finalUsername = tempUsername.trim();
-                                    setUsername(finalUsername);
-                                    if (rememberMe) {
-                                        localStorage.setItem('miro-username', finalUsername);
-                                    }
+                                    setUsername(tempUsername);
+                                    localStorage.setItem('miro-username', tempUsername);
                                     setShowUsernameModal(false);
                                 }
                             }}
                             disabled={!tempUsername.trim()}
-                            className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 disabled:from-gray-300 disabled:to-gray-400 text-white font-semibold py-3 rounded-xl transition-all shadow-md hover:shadow-lg disabled:cursor-not-allowed"
+                            className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 disabled:from-gray-300 disabled:to-gray-400 text-white font-semibold py-3 rounded-xl transition-all shadow-md"
                         >
                             Join Board
                         </button>
                     </div>
                 </div>
             )}
-            {/* UI Overlays */}
-            {selectedIds.length === 1 && (
-                <DimensionIndicator
-                    shape={shapes.find(s => s.id === selectedIds[0])}
-                    updateShape={updateShape}
-                    emitUpdateShape={emitUpdateShape}
-                />
-            )}
         </>
-    );
-};
-
-const DimensionIndicator = ({ shape, updateShape, emitUpdateShape }: any) => {
-    if (!shape || shape.type === 'pen' || shape.type === 'hand' || shape.type === 'select') return null;
-
-    const [localDimensions, setLocalDimensions] = React.useState({ width: shape.width, height: shape.height });
-
-    React.useEffect(() => {
-        setLocalDimensions({ width: Math.round(shape.width), height: Math.round(shape.height) });
-    }, [shape.width, shape.height]);
-
-    const handleCommit = (e: React.KeyboardEvent | React.FocusEvent) => {
-        const updates = {
-            width: Number((e.currentTarget as any).form?.width?.value) || localDimensions.width,
-            height: Number((e.currentTarget as any).form?.height?.value) || localDimensions.height
-        };
-        const updated = { ...shape, ...updates };
-        updateShape(shape.id, updated);
-        emitUpdateShape(updated);
-    };
-
-    return (
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-[var(--bg-toolbar)] backdrop-blur-xl p-2 rounded-2xl shadow-[var(--shadow-ui)] border border-[var(--border-ui)] flex items-center gap-3 animate-fade-in z-50">
-            <form className="flex items-center gap-2" onSubmit={(e) => e.preventDefault()}>
-                <div className="flex items-center gap-1.5 px-2">
-                    <span className="text-[10px] font-bold text-[var(--text-secondary)]">W</span>
-                    <input
-                        name="width"
-                        type="number"
-                        value={localDimensions.width}
-                        onChange={(e) => setLocalDimensions(prev => ({ ...prev, width: Number(e.target.value) }))}
-                        onBlur={handleCommit}
-                        onKeyDown={(e) => {
-                            e.stopPropagation();
-                            if (e.key === 'Enter') handleCommit(e);
-                        }}
-                        className="w-16 bg-transparent text-sm font-medium text-[var(--text-primary)] focus:outline-none"
-                    />
-                </div>
-                <div className="w-px h-4 bg-[var(--border-ui)]"></div>
-                <div className="flex items-center gap-1.5 px-2">
-                    <span className="text-[10px] font-bold text-[var(--text-secondary)]">H</span>
-                    <input
-                        name="height"
-                        type="number"
-                        value={localDimensions.height}
-                        onChange={(e) => setLocalDimensions(prev => ({ ...prev, height: Number(e.target.value) }))}
-                        onBlur={handleCommit}
-                        onKeyDown={(e) => {
-                            e.stopPropagation();
-                            if (e.key === 'Enter') handleCommit(e);
-                        }}
-                        className="w-16 bg-transparent text-sm font-medium text-[var(--text-primary)] focus:outline-none"
-                    />
-                </div>
-            </form>
-        </div>
     );
 };

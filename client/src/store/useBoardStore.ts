@@ -45,6 +45,10 @@ interface BoardStore {
     past: Shape[][];
     future: Shape[][];
     clipboard: Shape[];
+    isPublic: boolean;
+    sharePermission: 'view' | 'edit';
+    shareToken?: string;
+    isReadOnly: boolean;
 
     setTool: (tool: Tool) => void;
     setActiveColor: (color: string) => void;
@@ -65,6 +69,8 @@ interface BoardStore {
     redo: () => void;
     copy: () => void;
     paste: (position?: { x: number, y: number }) => Shape[];
+    setShareSettings: (settings: { isPublic?: boolean, sharePermission?: 'view' | 'edit', shareToken?: string }) => void;
+    setIsReadOnly: (isReadOnly: boolean) => void;
 }
 
 export const useBoardStore = create<BoardStore>((set) => ({
@@ -81,6 +87,9 @@ export const useBoardStore = create<BoardStore>((set) => ({
     past: [],
     future: [],
     clipboard: [],
+    isPublic: false,
+    sharePermission: 'view',
+    isReadOnly: false,
 
     setTool: (tool) => set({ tool }),
     setActiveColor: (color) => set({ activeColor: color }),
@@ -128,6 +137,7 @@ export const useBoardStore = create<BoardStore>((set) => ({
 
     saveToHistory: () =>
         set((state) => {
+            if (state.isReadOnly) return state;
             // Only keep last 50 steps
             const newPast = [...state.past, state.shapes].slice(-50);
             return { past: newPast, future: [] };
@@ -188,4 +198,7 @@ export const useBoardStore = create<BoardStore>((set) => ({
         });
         return newShapes;
     },
+
+    setShareSettings: (settings) => set((state) => ({ ...state, ...settings })),
+    setIsReadOnly: (isReadOnly) => set({ isReadOnly }),
 }));

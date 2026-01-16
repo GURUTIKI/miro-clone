@@ -46,6 +46,9 @@ interface Board {
   password?: string;
   shapes: Shape[];
   companyId: string; // Link to company
+  isPublic?: boolean;
+  sharePermission?: 'view' | 'edit';
+  shareToken?: string;
 }
 
 const companies: Record<string, Company> = {
@@ -132,7 +135,6 @@ app.post('/boards', (req, res) => {
   };
   res.json({ id, name });
 });
-
 app.post('/boards/:id/verify', (req, res) => {
   const { id } = req.params;
   const { password } = req.body;
@@ -145,14 +147,46 @@ app.post('/boards/:id/verify', (req, res) => {
 
   res.json({ success: true });
 });
-
-app.get('/boards/:id', (req, res) => {
+// Sharing endpoints
+app.patch('/boards/:id/share', (req, res) => {
   const { id } = req.params;
+  const { isPublic, sharePermission } = req.body;
   const board = boards[id];
 
   if (!board) return res.status(404).json({ error: 'Board not found' });
 
-  res.json({ id: board.id, name: board.name });
+  board.isPublic = isPublic;
+  board.sharePermission = sharePermission;
+  if (isPublic && !board.shareToken) {
+    board.shareToken = uuidv4();
+  }
+
+  res.json({
+    success: true,
+    isPublic: board.isPublic,
+    sharePermission: board.sharePermission,
+    shareToken: board.shareToken
+  });
+});
+
+app.get('/boards/:id', (req, res) => {
+  const { id } = req.params;
+  const { token } = req.query;
+  const board = boards[id];
+
+  if (!board) return res.status(404).json({ error: 'Board not found' });
+
+  // Allow access if public AND token matches, OR if user is logged in (handled by client normally, but server check here for safety)
+  // For MVP, if board is public, anyone with the ID can get meta, but shapes are protected by socket logic.
+  // We'll return shared status so frontend knows if it's a public session.
+
+  res.json({
+    id: board.id,
+    name: board.name,
+    isPublic: board.isPublic,
+    sharePermission: board.sharePermission,
+    shareToken: board.shareToken
+  });
 });
 
 // ... existing imports
