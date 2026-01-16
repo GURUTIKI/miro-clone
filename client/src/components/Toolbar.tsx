@@ -12,7 +12,9 @@ import {
     Settings,
     Sun,
     Moon,
-    Palette
+    Palette,
+    Undo2,
+    Redo2
 } from 'lucide-react';
 import { useBoardStore } from '../store/useBoardStore';
 import type { Tool, Shape } from '../store/useBoardStore';
@@ -36,7 +38,11 @@ export const Toolbar: React.FC<{
     emitAddShape: (shape: Shape) => void,
     emitBoardRename: (newName: string) => void
 }> = ({ emitAddShape, emitBoardRename }) => {
-    const { tool, setTool, activeColor, setActiveColor, addShape, setSelectedIds, isDarkMode, toggleDarkMode, boardName, setBoardName } = useBoardStore();
+    const {
+        tool, setTool, activeColor, setActiveColor, addShape,
+        setSelectedIds, isDarkMode, toggleDarkMode, boardName,
+        setBoardName, undo, redo, past, future
+    } = useBoardStore();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -117,7 +123,7 @@ export const Toolbar: React.FC<{
     };
 
     return (
-        <div className="fixed left-6 top-1/2 -translate-y-1/2 flex flex-col gap-2 bg-white/95 backdrop-blur-xl p-2.5 rounded-2xl shadow-lg border border-gray-200/60 z-50 transition-all duration-300 hover:shadow-xl">
+        <div className="fixed left-6 top-1/2 -translate-y-1/2 flex flex-col gap-1.5 bg-white/95 backdrop-blur-xl p-2 rounded-2xl shadow-lg border border-gray-200/60 z-50 transition-all duration-300 hover:shadow-xl dark:bg-slate-900/95 dark:border-slate-800">
             <input
                 type="file"
                 ref={fileInputRef}
@@ -131,19 +137,18 @@ export const Toolbar: React.FC<{
                     onClick={() => {
                         if (t.id === 'image') {
                             fileInputRef.current?.click();
-                            // Don't set tool to image effectively, just trigger upload
                         } else {
                             setTool(t.id);
                         }
                     }}
-                    className={`p-3 rounded-xl transition-all duration-200 flex items-center justify-center group relative
+                    className={`p-2.5 rounded-xl transition-all duration-200 flex items-center justify-center group relative
             ${tool === t.id && t.id !== 'image' && t.id !== 'palette'
                             ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30 scale-105'
-                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 hover:scale-105 active:scale-95'
+                            : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-slate-800 hover:text-gray-900 hover:scale-105 active:scale-95'
                         }`}
                     title={t.label}
                 >
-                    <t.icon size={20} strokeWidth={tool === t.id && t.id !== 'image' ? 2.5 : 2} className="transition-transform duration-200" />
+                    <t.icon size={18} strokeWidth={tool === t.id && t.id !== 'image' ? 2.5 : 2} className="transition-transform duration-200" />
 
                     {/* Tooltip */}
                     <span className="absolute left-full ml-3 px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
@@ -193,6 +198,33 @@ export const Toolbar: React.FC<{
                     <p className="text-[10px] text-gray-500 font-medium italic">Select a color, then pick a tool to draw.</p>
                 </div>
             )}
+
+            {/* Undo/Redo Section */}
+            <div className="h-px bg-[var(--border-ui)] my-1"></div>
+            <div className="flex flex-col gap-1.5 font-medium">
+                <button
+                    onClick={undo}
+                    disabled={past.length === 0}
+                    className="p-2.5 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed group relative transition-all"
+                    title="Undo (Ctrl+Z)"
+                >
+                    <Undo2 size={18} />
+                    <span className="absolute left-full ml-3 px-3 py-1.5 bg-gray-900 text-white text-[10px] font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
+                        Undo (Ctrl+Z)
+                    </span>
+                </button>
+                <button
+                    onClick={redo}
+                    disabled={future.length === 0}
+                    className="p-2.5 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed group relative transition-all"
+                    title="Redo (Ctrl+Shift+Z)"
+                >
+                    <Redo2 size={18} />
+                    <span className="absolute left-full ml-3 px-3 py-1.5 bg-gray-900 text-white text-[10px] font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
+                        Redo (Ctrl+Shift+Z)
+                    </span>
+                </button>
+            </div>
 
             {/* Settings Menu */}
             <div className="h-px bg-[var(--border-ui)] my-1"></div>
@@ -260,11 +292,11 @@ const SettingsMenu = ({ isDarkMode, toggleDarkMode, boardName, setBoardName, emi
         <div className="relative">
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className={`p-3 rounded-xl transition-all duration-200 flex items-center justify-center group relative
+                className={`p-2.5 rounded-xl transition-all duration-200 flex items-center justify-center group relative
                     ${isOpen ? 'bg-gray-100 dark:bg-slate-800 text-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800'}`}
                 title="Settings"
             >
-                <Settings size={20} className={isOpen ? 'rotate-90' : ''} />
+                <Settings size={18} className={isOpen ? 'rotate-90' : ''} />
             </button>
 
             {isOpen && (

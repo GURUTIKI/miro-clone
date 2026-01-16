@@ -42,6 +42,9 @@ interface BoardStore {
     penWidth: number;
     isDarkMode: boolean;
     boardName: string;
+    past: Shape[][];
+    future: Shape[][];
+    clipboard: Shape[];
 
     setTool: (tool: Tool) => void;
     setActiveColor: (color: string) => void;
@@ -57,6 +60,11 @@ interface BoardStore {
     setBoardName: (name: string) => void;
     setPenWidth: (width: number) => void;
     toggleLock: (id: string) => void;
+    saveToHistory: () => void;
+    undo: () => void;
+    redo: () => void;
+    copy: () => void;
+    paste: (position?: { x: number, y: number }) => Shape[];
 }
 
 export const useBoardStore = create<BoardStore>((set) => ({
@@ -70,6 +78,9 @@ export const useBoardStore = create<BoardStore>((set) => ({
     penWidth: 3,
     isDarkMode: localStorage.getItem('theme') === 'dark',
     boardName: 'Untitled Board',
+    past: [],
+    future: [],
+    clipboard: [],
 
     setTool: (tool) => set({ tool }),
     setActiveColor: (color) => set({ activeColor: color }),
@@ -114,4 +125,67 @@ export const useBoardStore = create<BoardStore>((set) => ({
         set((state) => ({
             shapes: state.shapes.map((s) => (s.id === id ? { ...s, locked: !s.locked } : s)),
         })),
+
+    saveToHistory: () =>
+        set((state) => {
+            // Only keep last 50 steps
+            const newPast = [...state.past, state.shapes].slice(-50);
+            return { past: newPast, future: [] };
+        }),
+
+    undo: () =>
+        set((state) => {
+            if (state.past.length === 0) return state;
+            const previous = state.past[state.past.length - 1];
+            const newPast = state.past.slice(0, state.past.length - 1);
+            return {
+                past: newPast,
+                shapes: previous,
+                future: [state.shapes, ...state.future],
+            };
+        }),
+
+    redo: () =>
+        set((state) => {
+            if (state.future.length === 0) return state;
+            const next = state.future[0];
+            const newFuture = state.future.slice(1);
+            return {
+                past: [...state.past, state.shapes],
+                shapes: next,
+                future: newFuture,
+            };
+        }),
+
+    copy: () =>
+        set((state) => {
+            const selectedShapes = state.shapes.filter((s) => state.selectedIds.includes(s.id));
+            if (selectedShapes.length === 0) return state;
+            return { clipboard: selectedShapes };
+        }),
+
+    paste: (pos) => {
+        let newShapes: Shape[] = [];
+        set((state) => {
+            if (state.clipboard.length === 0) return state;
+
+            const offset = 20;
+            newShapes = state.clipboard.map((s) => {
+                const newId = crypto.randomUUID();
+                return {
+                    ...s,
+                    id: newId,
+                    x: pos ? pos.x + (s.x - state.clipboard[0].x) : s.x + offset,
+                    y: pos ? pos.y + (s.y - state.clipboard[0].y) : s.y + offset,
+                    locked: false,
+                };
+            });
+
+            return {
+                shapes: [...state.shapes, ...newShapes],
+                selectedIds: newShapes.map((s) => s.id),
+            };
+        });
+        return newShapes;
+    },
 }));

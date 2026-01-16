@@ -46,6 +46,7 @@ const InPlaceEditor: React.FC<{
         const textarea = textareaRef.current;
         if (textarea) {
             const height = textarea.scrollHeight;
+            useBoardStore.getState().saveToHistory();
             onUpdate(localValue, height / scale);
         }
         onBlur();
@@ -123,7 +124,11 @@ export const Canvas: React.FC<CanvasProps> = ({
 
     const [selectionBox, setSelectionBox] = React.useState<{ x: number, y: number, width: number, height: number } | null>(null);
 
-    const { tool, setTool, shapes, cursors, addShape, updateShape, removeShape, selectedIds, setSelectedIds, scale, position, setViewport, activeColor, boardName } = useBoardStore();
+    const {
+        tool, setTool, shapes, cursors, addShape, updateShape, removeShape,
+        selectedIds, setSelectedIds, scale, position, setViewport,
+        activeColor, boardName, saveToHistory, undo, redo, copy, paste
+    } = useBoardStore();
     // Socket connection is now handled by parent
     // const { emitAddShape, emitUpdateShape, emitCursorMove, emitRemoveShape, socket } = useSocket(boardId);
 
@@ -193,13 +198,45 @@ export const Canvas: React.FC<CanvasProps> = ({
                         return !s?.locked;
                     });
 
-                    toRemove.forEach(id => {
-                        removeShape(id);
-                        emitRemoveShape(id);
-                    });
-
                     if (toRemove.length > 0) {
+                        saveToHistory();
+                        toRemove.forEach(id => {
+                            removeShape(id);
+                            emitRemoveShape(id);
+                        });
                         setSelectedIds([]);
+                    }
+                }
+            }
+
+            // Undo (Cmd+Z / Ctrl+Z)
+            if (e.key === 'z' && (e.metaKey || e.ctrlKey)) {
+                if (editingId) return;
+                e.preventDefault();
+                if (e.shiftKey) redo();
+                else undo();
+            }
+
+            // Copy (Cmd+C / Ctrl+C)
+            if (e.key === 'c' && (e.metaKey || e.ctrlKey)) {
+                if (editingId) return;
+                copy();
+            }
+
+            // Paste (Cmd+V / Ctrl+V)
+            if (e.key === 'v' && (e.metaKey || e.ctrlKey)) {
+                if (editingId) return;
+                // Get pointer position for paste
+                const stage = stageRef.current;
+                if (stage) {
+                    const sc = stage.scaleX();
+                    const pointer = stage.getPointerPosition();
+                    if (pointer) {
+                        const x = (pointer.x - stage.x()) / sc;
+                        const y = (pointer.y - stage.y()) / sc;
+                        saveToHistory();
+                        const pasted = paste({ x, y });
+                        pasted.forEach(s => emitAddShape(s));
                     }
                 }
             }
@@ -224,7 +261,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
         };
-    }, [selectedIds, editingId, removeShape, emitRemoveShape, setSelectedIds, tool]);
+    }, [selectedIds, editingId, removeShape, emitRemoveShape, setSelectedIds, tool, shapes, saveToHistory, undo, redo, copy, paste, spacePressed]);
 
     const handleMouseDown = (e: any) => {
         // If clicking on empty space
@@ -423,6 +460,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                 };
                 updateShape(shape.id, updated);
                 emitUpdateShape(updated);
+                saveToHistory(); // Save after creation/resize is finalized
 
                 // If text was created, enter edit mode
                 if (isText) {
@@ -689,6 +727,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                                             x: e.target.x(),
                                             y: e.target.y(),
                                         };
+                                        saveToHistory();
                                         updateShape(shape.id, updated);
                                         emitUpdateShape(updated);
                                     }}
@@ -736,12 +775,14 @@ export const Canvas: React.FC<CanvasProps> = ({
                                             height: newHeight,
                                         };
 
+                                        saveToHistory();
                                         updateShape(shape.id, updated);
                                         emitUpdateShape(updated);
                                     }}
                                     onContextMenu={(e: any) => {
                                         e.evt.preventDefault();
                                         if (confirm('Delete this shape?')) {
+                                            saveToHistory();
                                             removeShape(shape.id);
                                             emitRemoveShape(shape.id);
                                             setSelectedIds([]);
