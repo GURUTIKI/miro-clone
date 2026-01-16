@@ -3,7 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import { useBoardStore } from '../store/useBoardStore';
 import type { Shape } from '../store/useBoardStore';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const SOCKET_URL = import.meta.env.VITE_API_URL || 'https://miro-clone-5oig.onrender.com';
 
 export const useSocket = (boardId: string) => {
     const socketRef = useRef<Socket | null>(null);

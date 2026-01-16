@@ -140,7 +140,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     React.useEffect(() => {
         const fetchBoardName = async () => {
             try {
-                const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+                const API_URL = import.meta.env.VITE_API_URL || 'https://miro-clone-5oig.onrender.com';
                 const res = await fetch(`${API_URL}/boards/${boardId}`);
                 if (res.ok) {
                     const data = await res.json();

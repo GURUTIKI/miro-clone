@@ -41,7 +41,7 @@ export const Dashboard: React.FC = () => {
 
     const fetchBoards = async (companyId: string) => {
         try {
-            const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3001';
+            const API_URL = import.meta.env.VITE_API_URL || 'https://miro-clone-5oig.onrender.com';
             const res = await fetch(`${API_URL}/boards?companyId=${companyId}`);
             if (!res.ok) throw new Error('Failed to connect to server');
             const data = await res.json();
@@ -59,7 +59,7 @@ export const Dashboard: React.FC = () => {
         setIsLoading(true);
 
         try {
-            const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3001';
+            const API_URL = import.meta.env.VITE_API_URL || 'https://miro-clone-5oig.onrender.com';
             const res = await fetch(`${API_URL}/boards`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -90,7 +90,7 @@ export const Dashboard: React.FC = () => {
         if (joinPassword) {
             // Verify password API
             try {
-                const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3001';
+                const API_URL = import.meta.env.VITE_API_URL || 'https://miro-clone-5oig.onrender.com';
                 const res = await fetch(`${API_URL}/boards/${selectedBoardId}/verify`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

@@ -28,7 +28,7 @@ export const Login: React.FC = () => {
         setLoading(true);
 
         try {
-            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+            const API_URL = import.meta.env.VITE_API_URL || 'https://miro-clone-5oig.onrender.com';
             const res = await fetch(`${API_URL}/companies/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -70,7 +70,7 @@ export const Login: React.FC = () => {
         setLoading(true);
 
         try {
-            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+            const API_URL = import.meta.env.VITE_API_URL || 'https://miro-clone-5oig.onrender.com';
             const res = await fetch(`${API_URL}/companies`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
