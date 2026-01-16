@@ -191,12 +191,13 @@ io.on('connection', (socket) => {
     });
 
     // Handle cursor movement
-    socket.on('cursor-move', (cursor: { x: number; y: number }) => {
+    socket.on('cursor-move', (cursor: { x: number; y: number; username?: string }) => {
       socket.to(boardId).emit('cursor-move', {
         id: socket.id,
         x: cursor.x,
         y: cursor.y,
-        color: '#' + Math.floor(Math.random() * 16777215).toString(16)
+        color: '#' + Math.floor(Math.random() * 16777215).toString(16),
+        username: cursor.username
       });
     });
   }

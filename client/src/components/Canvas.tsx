@@ -90,12 +90,28 @@ export const Canvas: React.FC<{ boardId: string }> = ({ boardId }) => {
     const [boardName, setBoardName] = React.useState<string>('');
     const [spacePressed, setSpacePressed] = React.useState(false);
     const drawingShapeIdRef = React.useRef<string | null>(null);
+
+    // Username modal state
+    const [showUsernameModal, setShowUsernameModal] = React.useState(false);
+    const [username, setUsername] = React.useState('');
+    const [rememberMe, setRememberMe] = React.useState(false);
+    const [tempUsername, setTempUsername] = React.useState('');
     const startPosRef = React.useRef<{ x: number, y: number } | null>(null);
 
     const [selectionBox, setSelectionBox] = React.useState<{ x: number, y: number, width: number, height: number } | null>(null);
 
     const { tool, setTool, shapes, cursors, addShape, updateShape, removeShape, selectedIds, setSelectedIds, scale, position, setViewport, activeColor } = useBoardStore();
     const { emitAddShape, emitUpdateShape, emitCursorMove, emitRemoveShape } = useSocket(boardId);
+
+    // Check for saved username on mount
+    React.useEffect(() => {
+        const savedUsername = localStorage.getItem('miro-username');
+        if (savedUsername) {
+            setUsername(savedUsername);
+        } else {
+            setShowUsernameModal(true);
+        }
+    }, []);
 
     React.useEffect(() => {
         const fetchBoardName = async () => {
@@ -232,7 +248,7 @@ export const Canvas: React.FC<{ boardId: string }> = ({ boardId }) => {
         const x = (pointer.x - pos.x) / sc;
         const y = (pointer.y - pos.y) / sc;
 
-        emitCursorMove({ x, y });
+        emitCursorMove({ x, y, username });
 
         // Handle Box Selection
         if (tool === 'select' && !spacePressed && startPosRef.current && !drawingShapeIdRef.current) {
@@ -615,13 +631,25 @@ export const Canvas: React.FC<{ boardId: string }> = ({ boardId }) => {
 
                         {/* Render multiplayer cursors */}
                         {Object.values(cursors).map((cursor) => (
-                            <Group key={cursor.id} x={cursor.x} y={cursor.y}>
-                                <Circle radius={4} fill={cursor.color} />
-                                <Text
-                                    text={cursor.id.slice(0, 4)}
-                                    fontSize={10}
+                            <Group key={cursor.id} x={cursor.x + 12} y={cursor.y - 20}>
+                                {/* Rounded rectangle background */}
+                                <Rect
+                                    x={0}
+                                    y={0}
+                                    width={60}
+                                    height={20}
                                     fill={cursor.color}
-                                    y={6}
+                                    cornerRadius={4}
+                                    opacity={0.9}
+                                />
+                                {/* User label */}
+                                <Text
+                                    text={cursor.username || cursor.id.slice(0, 8)}
+                                    fontSize={11}
+                                    fill="#ffffff"
+                                    fontStyle="bold"
+                                    x={5}
+                                    y={5}
                                 />
                             </Group>
                         ))}
@@ -695,10 +723,66 @@ export const Canvas: React.FC<{ boardId: string }> = ({ boardId }) => {
 
                     {/* User Avatar */}
                     <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 border-2 border-white shadow-md cursor-pointer hover:shadow-lg hover:scale-105 transition-all flex items-center justify-center text-white text-xs font-bold">
-                        U
+                        {username ? username.charAt(0).toUpperCase() : 'U'}
                     </div>
                 </div>
             </div>
+
+            {/* Username Modal */}
+            {showUsernameModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full animate-fade-in">
+                        <h2 className="text-2xl font-bold text-gray-900 mb-2">Hi, who's there?!</h2>
+                        <p className="text-gray-600 mb-6">Let others know who you are</p>
+
+                        <input
+                            type="text"
+                            value={tempUsername}
+                            onChange={(e) => setTempUsername(e.target.value)}
+                            placeholder="Enter your name..."
+                            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors mb-4 text-lg"
+                            autoFocus
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && tempUsername.trim()) {
+                                    const finalUsername = tempUsername.trim();
+                                    setUsername(finalUsername);
+                                    if (rememberMe) {
+                                        localStorage.setItem('miro-username', finalUsername);
+                                    }
+                                    setShowUsernameModal(false);
+                                }
+                            }}
+                        />
+
+                        <label className="flex items-center gap-2 mb-6 cursor-pointer group">
+                            <input
+                                type="checkbox"
+                                checked={rememberMe}
+                                onChange={(e) => setRememberMe(e.target.checked)}
+                                className="w-5 h-5 rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                            />
+                            <span className="text-gray-700 group-hover:text-gray-900 transition-colors">Remember me</span>
+                        </label>
+
+                        <button
+                            onClick={() => {
+                                if (tempUsername.trim()) {
+                                    const finalUsername = tempUsername.trim();
+                                    setUsername(finalUsername);
+                                    if (rememberMe) {
+                                        localStorage.setItem('miro-username', finalUsername);
+                                    }
+                                    setShowUsernameModal(false);
+                                }
+                            }}
+                            disabled={!tempUsername.trim()}
+                            className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 disabled:from-gray-300 disabled:to-gray-400 text-white font-semibold py-3 rounded-xl transition-all shadow-md hover:shadow-lg disabled:cursor-not-allowed"
+                        >
+                            Join Board
+                        </button>
+                    </div>
+                </div>
+            )}
         </>
     );
 };

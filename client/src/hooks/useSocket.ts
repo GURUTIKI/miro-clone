@@ -61,7 +61,7 @@ export const useSocket = (boardId: string) => {
         socketRef.current?.emit('shape-removed', id);
     };
 
-    const emitCursorMove = (cursor: { x: number; y: number }) => {
+    const emitCursorMove = (cursor: { x: number; y: number; username?: string }) => {
         socketRef.current?.emit('cursor-move', cursor);
     };
 

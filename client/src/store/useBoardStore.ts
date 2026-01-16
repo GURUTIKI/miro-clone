@@ -24,6 +24,7 @@ export interface Cursor {
     x: number;
     y: number;
     color: string;
+    username?: string;
 }
 
 interface BoardStore {
