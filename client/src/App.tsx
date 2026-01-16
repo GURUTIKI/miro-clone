@@ -5,6 +5,7 @@ import './index.css';
 import React from 'react';
 import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom';
 import { Dashboard } from './components/Dashboard';
+import { Login } from './components/Login';
 
 const BoardView: React.FC = () => {
   const { boardId } = useParams<{ boardId: string }>();
@@ -23,7 +24,8 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/" element={<Login />} />
+        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/board/:boardId" element={<BoardView />} />
       </Routes>
     </BrowserRouter>

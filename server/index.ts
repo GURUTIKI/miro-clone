@@ -34,17 +34,68 @@ interface Shape {
   text?: string;
 }
 
+interface Company {
+  id: string;
+  name: string;
+  code: string; // Access code for the company
+}
+
 interface Board {
   id: string;
   name: string;
   password?: string;
   shapes: Shape[];
+  companyId: string; // Link to company
 }
 
+const companies: Record<string, Company> = {
+  // Seed with a demo company
+  'demo-company-id': {
+    id: 'demo-company-id',
+    name: 'Demo Company',
+    code: 'DEMO2024'
+  }
+};
 const boards: Record<string, Board> = {};
 
+// Company endpoints
+app.post('/companies/login', (req, res) => {
+  const { code } = req.body;
+
+  const company = Object.values(companies).find(c => c.code === code);
+
+  if (!company) {
+    return res.status(401).json({ error: 'Invalid company code' });
+  }
+
+  res.json({ id: company.id, name: company.name });
+});
+
+app.post('/companies', (req, res) => {
+  const { name, code } = req.body;
+  const id = uuidv4();
+
+  companies[id] = {
+    id,
+    name,
+    code
+  };
+
+  res.json({ id, name });
+});
+
+// Board endpoints
 app.get('/boards', (req, res) => {
-  const publicBoards = Object.values(boards).map(({ id, name, password }) => ({
+  const { companyId } = req.query;
+
+  let boardsList = Object.values(boards);
+
+  // Filter by company if companyId is provided
+  if (companyId) {
+    boardsList = boardsList.filter(b => b.companyId === companyId);
+  }
+
+  const publicBoards = boardsList.map(({ id, name, password }) => ({
     id,
     name,
     hasPassword: !!password
@@ -53,13 +104,19 @@ app.get('/boards', (req, res) => {
 });
 
 app.post('/boards', (req, res) => {
-  const { name, password } = req.body;
+  const { name, password, companyId } = req.body;
+
+  if (!companyId) {
+    return res.status(400).json({ error: 'Company ID is required' });
+  }
+
   const id = uuidv4();
   boards[id] = {
     id,
     name,
     password,
-    shapes: []
+    shapes: [],
+    companyId
   };
   res.json({ id, name });
 });
@@ -75,6 +132,15 @@ app.post('/boards/:id/verify', (req, res) => {
   }
 
   res.json({ success: true });
+});
+
+app.get('/boards/:id', (req, res) => {
+  const { id } = req.params;
+  const board = boards[id];
+
+  if (!board) return res.status(404).json({ error: 'Board not found' });
+
+  res.json({ id: board.id, name: board.name });
 });
 
 // ... existing imports
@@ -156,7 +222,8 @@ io.on('connection', (socket) => {
       boards[boardId] = {
         id: boardId,
         name: `Board ${boardId.slice(0, 8)}`,
-        shapes: []
+        shapes: [],
+        companyId: 'demo-company-id' // Default to demo company for now
       };
     }
 

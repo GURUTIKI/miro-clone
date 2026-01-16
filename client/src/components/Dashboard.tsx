@@ -6,7 +6,8 @@ import {
     ArrowRight,
     Zap,
     Infinity,
-    Lock
+    Lock,
+    LogOut
 } from 'lucide-react';
 
 interface Board {
@@ -22,32 +23,37 @@ export const Dashboard: React.FC = () => {
     const [password, setPassword] = useState('');
     const [joinPassword, setJoinPassword] = useState('');
     const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
+    const [company, setCompany] = useState<{ id: string; name: string } | null>(null);
 
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
-        fetchBoards();
-    }, []);
+        // Check for company session
+        const savedCompany = localStorage.getItem('company') || sessionStorage.getItem('company');
+        if (!savedCompany) {
+            navigate('/');
+            return;
+        }
+        setCompany(JSON.parse(savedCompany));
+        fetchBoards(JSON.parse(savedCompany).id);
+    }, [navigate]);
 
-    const fetchBoards = async () => {
+    const fetchBoards = async (companyId: string) => {
         try {
-            // Use 127.0.0.1 to avoid localhost resolution issues on Mac
             const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3001';
-            console.log('Fetching boards from:', API_URL);
-            const res = await fetch(`${API_URL}/boards`);
+            const res = await fetch(`${API_URL}/boards?companyId=${companyId}`);
             if (!res.ok) throw new Error('Failed to connect to server');
             const data = await res.json();
             setBoards(data);
         } catch (error) {
             console.error('Failed to fetch boards:', error);
-            // Don't show error immediately on load, just log it
         }
     };
 
     const handleCreateBoard = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newBoardName.trim()) return;
+        if (!newBoardName.trim() || !company) return;
 
         setError('');
         setIsLoading(true);
@@ -57,7 +63,7 @@ export const Dashboard: React.FC = () => {
             const res = await fetch(`${API_URL}/boards`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: newBoardName, password }),
+                body: JSON.stringify({ name: newBoardName, password, companyId: company.id }),
             });
 
             if (!res.ok) throw new Error(`Server error: ${res.status}`);
@@ -106,6 +112,14 @@ export const Dashboard: React.FC = () => {
         }
     };
 
+    const handleLogout = () => {
+        localStorage.removeItem('company');
+        sessionStorage.removeItem('company');
+        navigate('/');
+    };
+
+    if (!company) return null;
+
     return (
         <div className="fixed inset-0 w-full h-full bg-gradient-to-br from-gray-50 via-white to-blue-50 flex items-center justify-center p-6 overflow-auto">
             <div className="w-full max-w-5xl grid md:grid-cols-2 gap-8 items-center">
@@ -116,11 +130,23 @@ export const Dashboard: React.FC = () => {
                     <div className="absolute top-1/2 -right-20 w-80 h-80 bg-indigo-100 rounded-full blur-3xl opacity-30"></div>
 
                     <div className="relative z-10">
-                        <div className="flex items-center gap-3 mb-8">
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
-                                <span className="text-white font-bold text-xl tracking-tight">W</span>
+                        <div className="flex items-center justify-between mb-8">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
+                                    <span className="text-white font-bold text-xl tracking-tight">W</span>
+                                </div>
+                                <div>
+                                    <span className="text-2xl font-bold text-gray-900 tracking-tight block">Whiteboard</span>
+                                    <span className="text-sm text-gray-500 font-medium">{company.name}</span>
+                                </div>
                             </div>
-                            <span className="text-2xl font-bold text-gray-900 tracking-tight">Whiteboard</span>
+                            <button
+                                onClick={handleLogout}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-900"
+                                title="Logout"
+                            >
+                                <LogOut size={20} />
+                            </button>
                         </div>
 
                         <h1 className="text-4xl font-extrabold text-gray-900 leading-tight mb-6 tracking-tight">
