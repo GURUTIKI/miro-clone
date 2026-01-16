@@ -704,7 +704,12 @@ export const Canvas: React.FC<CanvasProps> = ({
                     scale={scale}
                     position={position}
                     onUpdate={(text, height) => {
-                        const updated = { ...shapes.find(s => s.id === editingId)!, text, height };
+                        const shape = shapes.find(s => s.id === editingId)!;
+                        // For artboards, only update text, never height (as it's just the label)
+                        const updated = shape.type === 'artboard'
+                            ? { ...shape, text }
+                            : { ...shape, text, height };
+
                         updateShape(editingId, updated);
                         emitUpdateShape(updated);
                     }}
@@ -765,15 +770,48 @@ export const Canvas: React.FC<CanvasProps> = ({
             </div>
 
             {/* Bottom Centered: Dimensions Indicator */}
-            {
-                selectedIds.length === 1 && shapes.find(s => s.id === selectedIds[0]) && shapes.find(s => s.id === selectedIds[0])?.type !== 'pen' && (
-                    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg border border-gray-100 dark:border-gray-700 z-50 pointer-events-none animate-fade-in">
-                        <span className="text-xs font-mono font-medium text-gray-600 dark:text-gray-300">
-                            {Math.round(shapes.find(s => s.id === selectedIds[0])!.width)} × {Math.round(shapes.find(s => s.id === selectedIds[0])!.height)} px
-                        </span>
+            {selectedIds.length === 1 && shapes.find(s => s.id === selectedIds[0]) && shapes.find(s => s.id === selectedIds[0])?.type !== 'pen' && (
+                <div
+                    className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm px-3 py-1.5 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 z-50 pointer-events-auto flex items-center gap-2 animate-fade-in"
+                    onMouseDown={(e) => e.stopPropagation()}
+                >
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">W</span>
+                        <input
+                            type="number"
+                            className="w-16 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 text-xs font-mono font-medium text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-center"
+                            value={Math.round(shapes.find(s => s.id === selectedIds[0])!.width)}
+                            onChange={(e) => {
+                                const val = parseInt(e.target.value);
+                                if (!isNaN(val) && val > 0) {
+                                    const s = shapes.find(s => s.id === selectedIds[0])!;
+                                    const updated = { ...s, width: val };
+                                    updateShape(s.id, updated);
+                                    emitUpdateShape(updated);
+                                }
+                            }}
+                        />
                     </div>
-                )
-            }
+                    <span className="text-gray-300 dark:text-gray-600">×</span>
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">H</span>
+                        <input
+                            type="number"
+                            className="w-16 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 text-xs font-mono font-medium text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-center"
+                            value={Math.round(shapes.find(s => s.id === selectedIds[0])!.height)}
+                            onChange={(e) => {
+                                const val = parseInt(e.target.value);
+                                if (!isNaN(val) && val > 0) {
+                                    const s = shapes.find(s => s.id === selectedIds[0])!;
+                                    const updated = { ...s, height: val };
+                                    updateShape(s.id, updated);
+                                    emitUpdateShape(updated);
+                                }
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* Username Modal */}
             {
