@@ -655,7 +655,7 @@ export const Canvas: React.FC<{ boardId: string }> = ({ boardId }) => {
                                         fill={cursor.color}
                                         fontStyle="bold"
                                         x={28}
-                                        y={10}
+                                        y={18}
                                         align="left"
                                         verticalAlign="middle"
                                         shadowColor="white"
