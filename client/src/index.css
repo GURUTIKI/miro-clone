@@ -249,3 +249,13 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--gray-400);
 }
+
+/* Custom Branded Cursor */
+.konvajs-content {
+  cursor: url('data:image/svg+xml;utf8,<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 3L13 22L17 14L25 11L6 3Z" fill="black" stroke="white" stroke-width="2" stroke-linejoin="round"/></svg>') 6 3, auto !important;
+}
+
+/* Ensure canvas inherits it */
+.konvajs-content canvas {
+  cursor: inherit !important;
+}

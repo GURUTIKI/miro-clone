@@ -637,16 +637,16 @@ export const Canvas: React.FC<{ boardId: string }> = ({ boardId }) => {
                                     data="M12 4L4 20L20 20Z"
                                     fill={cursor.color}
                                     stroke="white"
-                                    strokeWidth={2}
+                                    strokeWidth={3}
                                     lineJoin="round"
                                     lineCap="round"
-                                    scaleX={0.8}
-                                    scaleY={0.8}
+                                    scaleX={1.2}
+                                    scaleY={1.2}
                                     rotation={-30}
                                     shadowColor="black"
-                                    shadowBlur={2}
-                                    shadowOpacity={0.3}
-                                    shadowOffset={{ x: 1, y: 1 }}
+                                    shadowBlur={4}
+                                    shadowOpacity={0.2}
+                                    shadowOffset={{ x: 2, y: 2 }}
                                 />
 
                                 {/* User Name Label (Text Only) */}
@@ -655,7 +655,7 @@ export const Canvas: React.FC<{ boardId: string }> = ({ boardId }) => {
                                     fontSize={14}
                                     fill={cursor.color}
                                     fontStyle="bold"
-                                    x={25}
+                                    x={32}
                                     y={6}
                                     align="left"
                                     verticalAlign="middle"

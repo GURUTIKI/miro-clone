@@ -211,11 +211,18 @@ app.post('/upload', (req, res) => {
 // Socket.IO real-time synchronization
 const userColors: Record<string, string> = {};
 
+// Helper to generate pastel colors
+const generatePastelColor = () => {
+  const hue = Math.floor(Math.random() * 360);
+  // High brightness and lower saturation for pastel look
+  return `hsl(${hue}, 70%, 80%)`;
+};
+
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  // Assign a persistent color to this connection
-  userColors[socket.id] = '#' + Math.floor(Math.random() * 16777215).toString(16);
+  // Assign a persistent pastel color to this connection
+  userColors[socket.id] = generatePastelColor();
 
   const boardId = socket.handshake.query.boardId as string;
 
