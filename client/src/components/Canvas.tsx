@@ -57,11 +57,11 @@ const InPlaceEditor: React.FC<{
             className="text-editor-inplace"
             style={{
                 position: 'fixed',
-                top: (shape.y * scale) + position.y,
+                top: ((shape.y + (shape.type === 'artboard' ? -20 : 0)) * scale) + position.y,
                 left: (shape.x * scale) + position.x,
                 width: shape.width * scale,
-                minHeight: shape.height * scale,
-                fontSize: (shape.fontSize || (shape.type === 'text' ? 24 : 16)) * scale,
+                minHeight: (shape.type === 'artboard' ? 24 : shape.height) * scale,
+                fontSize: (shape.fontSize || (shape.type === 'text' ? 24 : (shape.type === 'artboard' ? 14 : 16))) * scale,
                 fontFamily: shape.fontFamily || 'Inter',
                 fontStyle: shape.fontStyle || 'normal',
                 textDecoration: shape.textDecoration || 'none',
@@ -486,8 +486,17 @@ export const Canvas: React.FC<CanvasProps> = ({
 
             // The shape ID might be on the group (parent) or the node itself
             let shapeId = clickedNode.id();
+
+            // Handle artboard labels which have "-label" suffix
+            if (shapeId && shapeId.endsWith('-label')) {
+                shapeId = shapeId.replace('-label', '');
+            }
+
             if (!shapeId && clickedNode.getParent()) {
                 shapeId = clickedNode.getParent().id();
+                if (shapeId && shapeId.endsWith('-label')) {
+                    shapeId = shapeId.replace('-label', '');
+                }
             }
 
             console.log('Resolved Shape ID:', shapeId);
@@ -524,11 +533,11 @@ export const Canvas: React.FC<CanvasProps> = ({
                     />
                     <Text
                         id={shape.id + '-label'}
-                        text={shape.locked ? "🔒 Artboard (Locked)" : "Artboard"}
+                        text={shape.text || (shape.locked ? "Artboard (Locked)" : "Artboard")}
                         y={-20}
                         fontSize={14}
                         fill={shape.locked ? "#ef4444" : "#999"}
-                        fontStyle={shape.locked ? "bold" : "normal"}
+                        fontStyle={(shape.locked || shape.text) ? "bold" : "normal"}
                     />
                     <Group
                         x={shape.width - 24}
