@@ -15,7 +15,7 @@ const BoardView: React.FC = () => {
   if (!boardId) return <div>Invalid Board ID</div>;
 
   return (
-    <div className="w-full h-screen overflow-hidden bg-gray-50 relative">
+    <div className="w-full h-screen overflow-hidden bg-[var(--bg-canvas)] relative">
       <Toolbar emitAddShape={emitAddShape} emitBoardRename={emitBoardRename} />
       <Canvas
         boardId={boardId}

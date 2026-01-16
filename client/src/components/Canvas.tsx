@@ -111,7 +111,6 @@ export const Canvas: React.FC<CanvasProps> = ({
     const stageRef = useRef<any>(null);
     const transformerRef = useRef<any>(null);
     const [editingId, setEditingId] = React.useState<string | null>(null);
-    const [boardName, setBoardName] = React.useState<string>('');
     const [spacePressed, setSpacePressed] = React.useState(false);
     const drawingShapeIdRef = React.useRef<string | null>(null);
 
@@ -124,7 +123,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
     const [selectionBox, setSelectionBox] = React.useState<{ x: number, y: number, width: number, height: number } | null>(null);
 
-    const { tool, setTool, shapes, cursors, addShape, updateShape, removeShape, selectedIds, setSelectedIds, scale, position, setViewport, activeColor } = useBoardStore();
+    const { tool, setTool, shapes, cursors, addShape, updateShape, removeShape, selectedIds, setSelectedIds, scale, position, setViewport, activeColor, boardName } = useBoardStore();
     // Socket connection is now handled by parent
     // const { emitAddShape, emitUpdateShape, emitCursorMove, emitRemoveShape, socket } = useSocket(boardId);
 
@@ -141,11 +140,11 @@ export const Canvas: React.FC<CanvasProps> = ({
     React.useEffect(() => {
         const fetchBoardName = async () => {
             try {
-                const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3001';
-                const res = await fetch(`${API_URL} /boards/${boardId} `);
+                const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+                const res = await fetch(`${API_URL}/boards/${boardId}`);
                 if (res.ok) {
                     const data = await res.json();
-                    setBoardName(data.name);
+                    useBoardStore.getState().setBoardName(data.name);
                 }
             } catch (error) {
                 console.error('Failed to fetch board name:', error);
@@ -158,8 +157,15 @@ export const Canvas: React.FC<CanvasProps> = ({
         if (transformerRef.current) {
             const stage = stageRef.current;
             const nodes = selectedIds
-                .map(id => stage.findOne('#' + id))
-                .filter(node => node !== undefined);
+                .map(id => {
+                    const node = stage.findOne('#' + id);
+                    if (!node) return null;
+                    // Skip transformer nodes for pen tool
+                    const shape = shapes.find(s => s.id === id);
+                    if (shape?.type === 'pen') return null;
+                    return node;
+                })
+                .filter(node => node !== null);
 
             if (nodes.length > 0) {
                 transformerRef.current.nodes(nodes);
@@ -679,7 +685,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                                             setSelectedIds([]);
                                         }
                                     }}
-                                    stroke={isSelected ? '#2196f3' : 'transparent'}
+                                    stroke={(isSelected && shape.type !== 'pen') ? '#2196f3' : 'transparent'}
                                     strokeWidth={2}
                                 >
                                     {renderShape(shape)}
@@ -939,7 +945,10 @@ const DimensionIndicator = ({ shape, updateShape, emitUpdateShape }: any) => {
                         value={localDimensions.width}
                         onChange={(e) => setLocalDimensions(prev => ({ ...prev, width: Number(e.target.value) }))}
                         onBlur={handleCommit}
-                        onKeyDown={(e) => e.key === 'Enter' && handleCommit(e)}
+                        onKeyDown={(e) => {
+                            e.stopPropagation();
+                            if (e.key === 'Enter') handleCommit(e);
+                        }}
                         className="w-16 bg-transparent text-sm font-medium text-[var(--text-primary)] focus:outline-none"
                     />
                 </div>
@@ -952,7 +961,10 @@ const DimensionIndicator = ({ shape, updateShape, emitUpdateShape }: any) => {
                         value={localDimensions.height}
                         onChange={(e) => setLocalDimensions(prev => ({ ...prev, height: Number(e.target.value) }))}
                         onBlur={handleCommit}
-                        onKeyDown={(e) => e.key === 'Enter' && handleCommit(e)}
+                        onKeyDown={(e) => {
+                            e.stopPropagation();
+                            if (e.key === 'Enter') handleCommit(e);
+                        }}
                         className="w-16 bg-transparent text-sm font-medium text-[var(--text-primary)] focus:outline-none"
                     />
                 </div>
