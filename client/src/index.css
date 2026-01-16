@@ -1,0 +1,251 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Miro-Inspired Design System */
+
+:root {
+  /* Typography */
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  /* Miro Color Palette */
+  --miro-blue: #2D9CDB;
+  --miro-blue-dark: #1E88C7;
+  --miro-yellow: #FFD02F;
+  --miro-yellow-dark: #F5C518;
+
+  /* Neutrals */
+  --gray-50: #FAFBFC;
+  --gray-100: #F4F5F7;
+  --gray-200: #E8EAED;
+  --gray-300: #D1D5DB;
+  --gray-400: #9CA3AF;
+  --gray-500: #6B7280;
+  --gray-600: #4B5563;
+  --gray-700: #374151;
+  --gray-800: #1F2937;
+  --gray-900: #111827;
+
+  /* Semantic Colors */
+  --bg-canvas: #FFFFFF;
+  --bg-page: #F5F5F5;
+  --text-primary: #050038;
+  --text-secondary: #6B7280;
+  --border-light: #E8EAED;
+  --border-medium: #D1D5DB;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* Border Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+}
+
+#root {
+  width: 100%;
+  height: 100vh;
+  isolation: isolate;
+}
+
+/* Dotted Grid Pattern for Canvas */
+.canvas-grid {
+  background-color: var(--bg-canvas);
+  background-image:
+    radial-gradient(circle, var(--gray-300) 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-position: 0 0;
+}
+
+/* Toolbar Styles */
+.toolbar-container {
+  position: fixed;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  padding: 8px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 1000;
+  border: 1px solid var(--border-light);
+  transition: box-shadow var(--transition-base);
+}
+
+.toolbar-container:hover {
+  box-shadow: var(--shadow-xl);
+}
+
+.tool-button {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--gray-600);
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+.tool-button:hover {
+  background: var(--gray-100);
+  color: var(--gray-900);
+  transform: scale(1.05);
+}
+
+.tool-button:active {
+  transform: scale(0.95);
+}
+
+.tool-button.active {
+  background: var(--miro-blue);
+  color: white;
+  box-shadow: 0 4px 12px rgba(45, 156, 219, 0.3);
+}
+
+/* Text Editor */
+.text-editor {
+  border: 2px solid var(--miro-blue);
+  background: white;
+  padding: 12px;
+  font-family: inherit;
+  font-size: 16px;
+  resize: none;
+  z-index: 2000;
+  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: box-shadow var(--transition-base);
+}
+
+.text-editor:focus {
+  box-shadow: 0 0 0 3px rgba(45, 156, 219, 0.1), var(--shadow-lg);
+}
+
+.text-editor-inplace {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  resize: none !important;
+  overflow: hidden !important;
+  padding: 0;
+  margin: 0;
+  z-index: 2000;
+  line-height: normal;
+  box-shadow: none !important;
+}
+
+.text-editor-inplace:focus {
+  box-shadow: none !important;
+}
+
+/* Smooth Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn var(--transition-base) ease-out;
+}
+
+.animate-slide-in {
+  animation: slideIn var(--transition-base) ease-out;
+}
+
+/* Utility Classes */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.hover-lift {
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--gray-100);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--gray-300);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-400);
+}
