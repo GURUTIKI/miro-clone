@@ -187,11 +187,20 @@ export const Canvas: React.FC<CanvasProps> = ({
                 if (selectedIds.length > 0) {
                     e.preventDefault(); // Prevent browser back navigation
                     console.log('Deleting shapes:', selectedIds);
-                    selectedIds.forEach(id => {
+
+                    const toRemove = selectedIds.filter(id => {
+                        const s = shapes.find(shape => shape.id === id);
+                        return !s?.locked;
+                    });
+
+                    toRemove.forEach(id => {
                         removeShape(id);
                         emitRemoveShape(id);
                     });
-                    setSelectedIds([]);
+
+                    if (toRemove.length > 0) {
+                        setSelectedIds([]);
+                    }
                 }
             }
 
@@ -261,7 +270,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     fill: activeColor,
                     ...(tool === 'text' ? { text: 'Type here', fontSize: 24 } : {}),
                     ...(tool === 'sticky' ? { width: 150, height: 150 } : {}),
-                    ...(tool === 'artboard' ? { width: 400, height: 300, fill: 'white' } : {})
+                    ...(tool === 'artboard' ? { width: 400, height: 300, fill: activeColor } : {})
                 };
 
                 addShape(newShape);
@@ -360,12 +369,33 @@ export const Canvas: React.FC<CanvasProps> = ({
 
             // Find overlapping shapes
             const foundIds = shapes.filter(shape => {
+                let sX = shape.x;
+                let sY = shape.y;
+                let sW = shape.width;
+                let sH = shape.height;
+
+                // For pen tools, we calculate the bounding box from points
+                if (shape.type === 'pen' && shape.points) {
+                    const pts = shape.points;
+                    let minX = pts[0], maxX = pts[0], minY = pts[1], maxY = pts[1];
+                    for (let i = 0; i < pts.length; i += 2) {
+                        minX = Math.min(minX, pts[i]);
+                        maxX = Math.max(maxX, pts[i]);
+                        minY = Math.min(minY, pts[i + 1]);
+                        maxY = Math.max(maxY, pts[i + 1]);
+                    }
+                    sX = minX;
+                    sY = minY;
+                    sW = maxX - minX;
+                    sH = maxY - minY;
+                }
+
                 // AABB intersection
                 return (
-                    x < shape.x + shape.width &&
-                    x + w > shape.x &&
-                    y < shape.y + shape.height &&
-                    y + h > shape.y
+                    x < sX + sW &&
+                    x + w > sX &&
+                    y < sY + sH &&
+                    y + h > sY
                 );
             }).map(s => s.id);
 
@@ -490,14 +520,32 @@ export const Canvas: React.FC<CanvasProps> = ({
                         fill="#ffffff"
                         stroke="#e0e0e0"
                         strokeWidth={1}
+                        cornerRadius={4}
                     />
                     <Text
-                        id={shape.id + '-label'} // Add partial ID so double click can find parent
-                        text="Artboard"
+                        id={shape.id + '-label'}
+                        text={shape.locked ? "🔒 Artboard (Locked)" : "Artboard"}
                         y={-20}
                         fontSize={14}
-                        fill="#999"
+                        fill={shape.locked ? "#ef4444" : "#999"}
+                        fontStyle={shape.locked ? "bold" : "normal"}
                     />
+                    <Group
+                        x={shape.width - 24}
+                        y={-28}
+                        onClick={(e) => {
+                            e.cancelBubble = true;
+                            useBoardStore.getState().toggleLock(shape.id);
+                        }}
+                    >
+                        <Rect width={24} height={24} fill="transparent" />
+                        <Text
+                            text={shape.locked ? "🔒" : "🔓"}
+                            fontSize={16}
+                            align="center"
+                            verticalAlign="middle"
+                        />
+                    </Group>
                 </>
             );
         }
@@ -614,7 +662,11 @@ export const Canvas: React.FC<CanvasProps> = ({
                                     y={shape.type === 'pen' ? 0 : shape.y} // Pen tool handles its own coordinates
                                     draggable={(tool === 'select' && !spacePressed) || (tool === 'hand' && false)} // Only draggable in select mode
                                     onClick={(e) => handleShapeClick(shape.id, e)}
-                                    onDragStart={() => {
+                                    onDragStart={(e: any) => {
+                                        if (shape.locked) {
+                                            e.target.stopDrag();
+                                            return;
+                                        }
                                         // If not already selected, select it (exclusive)
                                         if (!selectedIds.includes(shape.id)) {
                                             setSelectedIds([shape.id]);
@@ -622,6 +674,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                                         if (tool !== 'select') setTool('select'); // Auto-switch on drag too
                                     }}
                                     onDragEnd={(e: any) => {
+                                        if (shape.locked) return;
                                         const updated = {
                                             ...shape,
                                             x: e.target.x(),
@@ -685,7 +738,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                                             setSelectedIds([]);
                                         }
                                     }}
-                                    stroke={(isSelected && shape.type !== 'pen') ? '#2196f3' : 'transparent'}
+                                    stroke={(isSelected && shape.type !== 'pen') ? (shape.locked ? '#ef4444' : '#2196f3') : 'transparent'}
                                     strokeWidth={2}
                                 >
                                     {renderShape(shape)}

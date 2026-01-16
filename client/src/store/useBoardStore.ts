@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type Tool = 'select' | 'rectangle' | 'circle' | 'text' | 'sticky' | 'artboard' | 'hand' | 'image' | 'pen';
+export type Tool = 'select' | 'rectangle' | 'circle' | 'text' | 'sticky' | 'artboard' | 'hand' | 'image' | 'pen' | 'palette';
 
 export interface Shape {
     id: string;
@@ -20,6 +20,7 @@ export interface Shape {
     points?: number[]; // For freehand pen
     stroke?: string;   // For pen
     strokeWidth?: number; // For pen
+    locked?: boolean;
 }
 
 export interface Cursor {
@@ -55,6 +56,7 @@ interface BoardStore {
     toggleDarkMode: () => void;
     setBoardName: (name: string) => void;
     setPenWidth: (width: number) => void;
+    toggleLock: (id: string) => void;
 }
 
 export const useBoardStore = create<BoardStore>((set) => ({
@@ -108,4 +110,8 @@ export const useBoardStore = create<BoardStore>((set) => ({
     }),
     setBoardName: (name) => set({ boardName: name }),
     setPenWidth: (width) => set({ penWidth: width }),
+    toggleLock: (id) =>
+        set((state) => ({
+            shapes: state.shapes.map((s) => (s.id === id ? { ...s, locked: !s.locked } : s)),
+        })),
 }));

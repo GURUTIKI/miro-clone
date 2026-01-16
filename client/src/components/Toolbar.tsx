@@ -11,7 +11,8 @@ import {
     Pencil,
     Settings,
     Sun,
-    Moon
+    Moon,
+    Palette
 } from 'lucide-react';
 import { useBoardStore } from '../store/useBoardStore';
 import type { Tool, Shape } from '../store/useBoardStore';
@@ -28,6 +29,7 @@ const tools: { id: Tool; icon: any; label: string }[] = [
     { id: 'sticky', icon: StickyNote, label: 'Sticky Note' },
     { id: 'artboard', icon: Layout, label: 'Artboard' },
     { id: 'image', icon: ImageIcon, label: 'Image' },
+    { id: 'palette' as Tool, icon: Palette, label: 'Colors' },
 ];
 
 export const Toolbar: React.FC<{
@@ -36,8 +38,6 @@ export const Toolbar: React.FC<{
 }> = ({ emitAddShape, emitBoardRename }) => {
     const { tool, setTool, activeColor, setActiveColor, addShape, setSelectedIds, isDarkMode, toggleDarkMode, boardName, setBoardName } = useBoardStore();
     const fileInputRef = useRef<HTMLInputElement>(null);
-
-    const COLORS = ['#fff9c4', '#ffccbc', '#b3e5fc', '#c8e6c9', '#f8bbd0', '#d7ccc8'];
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -137,7 +137,7 @@ export const Toolbar: React.FC<{
                         }
                     }}
                     className={`p-3 rounded-xl transition-all duration-200 flex items-center justify-center group relative
-            ${tool === t.id && t.id !== 'image'
+            ${tool === t.id && t.id !== 'image' && t.id !== 'palette'
                             ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30 scale-105'
                             : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 hover:scale-105 active:scale-95'
                         }`}
@@ -152,26 +152,6 @@ export const Toolbar: React.FC<{
                 </button>
             ))}
 
-            {/* Divider */}
-            {/* Same divider logic ... */}
-            {tool === 'sticky' && (
-                <div className="h-px bg-gray-200 my-1"></div>
-            )}
-
-            {tool === 'sticky' && (
-                <div className="absolute left-full top-0 ml-3 bg-white/95 backdrop-blur-xl p-3 rounded-2xl shadow-lg border border-gray-200/60 grid grid-cols-3 gap-2 w-max animate-fade-in">
-                    {COLORS.map((color) => (
-                        <button
-                            key={color}
-                            className={`w-9 h-9 rounded-lg border-2 transition-all hover:scale-110 active:scale-95 shadow-sm hover:shadow-md ${activeColor === color ? 'border-blue-500 ring-2 ring-blue-500/30 scale-105' : 'border-gray-200 hover:border-gray-300'}`}
-                            style={{ backgroundColor: color }}
-                            onClick={() => setActiveColor(color)}
-                            title={color}
-                        />
-                    ))}
-                </div>
-            )}
-
             {/* Text Styling Toolbar */}
             {tool === 'text' && (
                 <TextToolbar />
@@ -184,6 +164,34 @@ export const Toolbar: React.FC<{
             {/* Pen Styling Toolbar */}
             {tool === 'pen' && (
                 <PenToolbar />
+            )}
+
+            {/* Global Palette Overlay */}
+            {tool === 'palette' && (
+                <div className="absolute left-full top-0 ml-3 bg-white/95 backdrop-blur-xl p-4 rounded-2xl shadow-xl border border-gray-200/60 flex flex-col gap-3 min-w-[180px] animate-fade-in">
+                    <div className="flex items-center gap-2 mb-1">
+                        <div className="w-4 h-4 rounded-full bg-gradient-to-tr from-red-500 via-green-500 to-blue-500"></div>
+                        <span className="text-xs font-bold text-gray-800 uppercase tracking-wider">Global Colors</span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                        {['#333333', '#EB5757', '#F2994A', '#F2C94C', '#219653', '#2F80ED', '#9B51E0', '#fff9c4', '#ffccbc', '#b3e5fc', '#c8e6c9', '#f8bbd0'].map((color) => (
+                            <button
+                                key={color}
+                                className={`w-8 h-8 rounded-lg border-2 transition-all hover:scale-110 active:scale-95 shadow-sm ${activeColor === color ? 'border-blue-500 ring-2 ring-blue-500/40' : 'border-transparent'}`}
+                                style={{ backgroundColor: color }}
+                                onClick={() => {
+                                    setActiveColor(color);
+                                    // Switch back to previous tool or just stay? 
+                                    // User said "whatever tool you pick after selecting a colour"
+                                    // So we just stay in palette mode or switch to select?
+                                    // Let's stay so they can see selection.
+                                }}
+                            />
+                        ))}
+                    </div>
+                    <div className="h-px bg-gray-100 my-1"></div>
+                    <p className="text-[10px] text-gray-500 font-medium italic">Select a color, then pick a tool to draw.</p>
+                </div>
             )}
 
             {/* Settings Menu */}
@@ -200,22 +208,11 @@ export const Toolbar: React.FC<{
 };
 
 const PenToolbar = () => {
-    const { activeColor, setActiveColor, penWidth, setPenWidth } = useBoardStore();
-    const COLORS = ['#333333', '#EB5757', '#F2994A', '#F2C94C', '#219653', '#2F80ED', '#9B51E0'];
+    const { penWidth, setPenWidth } = useBoardStore();
 
     return (
         <div className="absolute left-full top-0 ml-3 bg-[var(--bg-toolbar)] backdrop-blur-xl p-3 rounded-2xl shadow-[var(--shadow-ui)] border border-[var(--border-ui)] flex flex-col gap-3 w-max animate-fade-in z-[60]">
-            <p className="text-[10px] uppercase font-bold text-[var(--text-secondary)] tracking-wider">Pen Color</p>
-            <div className="grid grid-cols-4 gap-1.5">
-                {COLORS.map((color) => (
-                    <button
-                        key={color}
-                        className={`w-7 h-7 rounded-full border-2 transition-all hover:scale-110 active:scale-95 ${activeColor === color ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-transparent'}`}
-                        style={{ backgroundColor: color }}
-                        onClick={() => setActiveColor(color)}
-                    />
-                ))}
-            </div>
+            {/* Color section removed in favor of global palette */}
 
             <div className="h-px bg-[var(--border-ui)]"></div>
 
