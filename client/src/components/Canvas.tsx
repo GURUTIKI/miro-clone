@@ -1,11 +1,11 @@
 import React, { useRef, useLayoutEffect } from 'react';
-import { Stage, Layer, Rect, Circle, Text, Group, Transformer, Image as KonvaImage } from 'react-konva';
+import { Stage, Layer, Rect, Circle, Text, Group, Transformer, Image as KonvaImage, Path } from 'react-konva';
 import useImage from 'use-image';
 import { useBoardStore } from '../store/useBoardStore';
 import type { Shape } from '../store/useBoardStore';
 import { v4 as uuidv4 } from 'uuid';
 import { useSocket } from '../hooks/useSocket';
-import { LogOut } from 'lucide-react';
+import { LogOut, Plus, Minus } from 'lucide-react';
 
 const SCALE_BY = 1.05;
 
@@ -631,26 +631,36 @@ export const Canvas: React.FC<{ boardId: string }> = ({ boardId }) => {
 
                         {/* Render multiplayer cursors */}
                         {Object.values(cursors).map((cursor) => (
-                            <Group key={cursor.id} x={cursor.x + 12} y={cursor.y - 20}>
-                                {/* Rounded rectangle background */}
-                                <Rect
-                                    x={0}
-                                    y={0}
-                                    width={60}
-                                    height={20}
+                            <Group key={cursor.id} x={cursor.x} y={cursor.y}>
+                                {/* Cursor Pointer (Arrow) */}
+                                <Path
+                                    data="M0,0 L12,12 L8,12 L12,20 L10,21 L6,13 L2,17 L0,0Z"
                                     fill={cursor.color}
-                                    cornerRadius={4}
-                                    opacity={0.9}
+                                    stroke="white"
+                                    strokeWidth={1}
                                 />
-                                {/* User label */}
-                                <Text
-                                    text={cursor.username || cursor.id.slice(0, 8)}
-                                    fontSize={11}
-                                    fill="#ffffff"
-                                    fontStyle="bold"
-                                    x={5}
-                                    y={5}
-                                />
+
+                                {/* Label Bubble */}
+                                <Group x={16} y={0}>
+                                    <Rect
+                                        width={Math.max(60, (cursor.username?.length || 8) * 8)}
+                                        height={22}
+                                        fill={cursor.color}
+                                        cornerRadius={[0, 8, 8, 8]}
+                                        shadowColor="black"
+                                        shadowBlur={2}
+                                        shadowOpacity={0.2}
+                                        shadowOffset={{ x: 1, y: 1 }}
+                                    />
+                                    <Text
+                                        text={cursor.username || cursor.id.slice(0, 8)}
+                                        fontSize={12}
+                                        fill="#ffffff"
+                                        fontStyle="bold"
+                                        padding={5}
+                                        y={5}
+                                    />
+                                </Group>
                             </Group>
                         ))}
 
@@ -708,6 +718,30 @@ export const Canvas: React.FC<{ boardId: string }> = ({ boardId }) => {
                 {/* Right: Actions */}
                 <div className="pointer-events-auto flex items-center gap-2">
 
+                    {/* Active Users List */}
+                    <div className="flex items-center -space-x-2 mr-2">
+                        {Object.values(cursors).slice(0, 3).map((cursor) => (
+                            <div
+                                key={cursor.id}
+                                className="w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-white text-[10px] font-bold shadow-sm"
+                                style={{ backgroundColor: cursor.color }}
+                                title={cursor.username || cursor.id}
+                            >
+                                {(cursor.username || cursor.id).slice(0, 2).toUpperCase()}
+                            </div>
+                        ))}
+                        {Object.values(cursors).length > 3 && (
+                            <div className="w-8 h-8 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-gray-600 text-[10px] font-bold shadow-sm">
+                                +{Object.values(cursors).length - 3}
+                            </div>
+                        )}
+
+                        {/* Current User Avatar */}
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 border-2 border-white shadow-md cursor-pointer hover:shadow-lg hover:scale-105 transition-all flex items-center justify-center text-white text-xs font-bold z-10">
+                            {username ? username.slice(0, 2).toUpperCase() : 'ME'}
+                        </div>
+                    </div>
+
                     {/* Separator */}
                     <div className="h-8 w-px bg-gray-200 mx-1"></div>
 
@@ -720,12 +754,32 @@ export const Canvas: React.FC<{ boardId: string }> = ({ boardId }) => {
                         <LogOut size={16} strokeWidth={2} />
                         Exit
                     </button>
-
-                    {/* User Avatar */}
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 border-2 border-white shadow-md cursor-pointer hover:shadow-lg hover:scale-105 transition-all flex items-center justify-center text-white text-xs font-bold">
-                        {username ? username.charAt(0).toUpperCase() : 'U'}
-                    </div>
                 </div>
+            </div>
+
+            {/* Zoom Controls (Bottom Right) */}
+            <div className="fixed bottom-6 right-6 flex flex-col gap-2 pointer-events-auto shadow-lg bg-white rounded-lg p-1 border border-gray-100">
+                <button
+                    className="p-2 hover:bg-gray-50 text-gray-700 rounded transition-colors"
+                    onClick={() => {
+                        const newScale = scale * 1.2;
+                        setViewport(newScale, position);
+                    }}
+                    title="Zoom In"
+                >
+                    <Plus size={20} />
+                </button>
+                <div className="h-px bg-gray-100 mx-2"></div>
+                <button
+                    className="p-2 hover:bg-gray-50 text-gray-700 rounded transition-colors"
+                    onClick={() => {
+                        const newScale = scale / 1.2;
+                        setViewport(newScale, position);
+                    }}
+                    title="Zoom Out"
+                >
+                    <Minus size={20} />
+                </button>
             </div>
 
             {/* Username Modal */}

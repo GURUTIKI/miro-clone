@@ -209,8 +209,13 @@ app.post('/upload', (req, res) => {
 });
 
 // Socket.IO real-time synchronization
+const userColors: Record<string, string> = {};
+
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
+
+  // Assign a persistent color to this connection
+  userColors[socket.id] = '#' + Math.floor(Math.random() * 16777215).toString(16);
 
   const boardId = socket.handshake.query.boardId as string;
 
@@ -263,7 +268,7 @@ io.on('connection', (socket) => {
         id: socket.id,
         x: cursor.x,
         y: cursor.y,
-        color: '#' + Math.floor(Math.random() * 16777215).toString(16),
+        color: userColors[socket.id],
         username: cursor.username
       });
     });
@@ -271,6 +276,7 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
+    delete userColors[socket.id];
     if (boardId) {
       socket.to(boardId).emit('user-disconnected', socket.id);
     }
