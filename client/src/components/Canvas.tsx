@@ -631,36 +631,39 @@ export const Canvas: React.FC<{ boardId: string }> = ({ boardId }) => {
 
                         {/* Render multiplayer cursors */}
                         {Object.values(cursors).map((cursor) => (
-                            <Group key={cursor.id} x={cursor.x} y={cursor.y}>
-                                {/* Cursor Pointer (Arrow) */}
+                            <Group key={cursor.id} x={cursor.x + 10} y={cursor.y - 10}>
+                                {/* Cursor Pointer (Rounded Triangle) */}
                                 <Path
-                                    data="M0,0 L12,12 L8,12 L12,20 L10,21 L6,13 L2,17 L0,0Z"
+                                    data="M12 4L4 20L20 20Z"
                                     fill={cursor.color}
                                     stroke="white"
-                                    strokeWidth={1}
+                                    strokeWidth={2}
+                                    lineJoin="round"
+                                    lineCap="round"
+                                    scaleX={0.8}
+                                    scaleY={0.8}
+                                    rotation={-30}
+                                    shadowColor="black"
+                                    shadowBlur={2}
+                                    shadowOpacity={0.3}
+                                    shadowOffset={{ x: 1, y: 1 }}
                                 />
 
-                                {/* Label Bubble */}
-                                <Group x={16} y={0}>
-                                    <Rect
-                                        width={Math.max(60, (cursor.username?.length || 8) * 8)}
-                                        height={22}
-                                        fill={cursor.color}
-                                        cornerRadius={[0, 8, 8, 8]}
-                                        shadowColor="black"
-                                        shadowBlur={2}
-                                        shadowOpacity={0.2}
-                                        shadowOffset={{ x: 1, y: 1 }}
-                                    />
-                                    <Text
-                                        text={cursor.username || cursor.id.slice(0, 8)}
-                                        fontSize={12}
-                                        fill="#ffffff"
-                                        fontStyle="bold"
-                                        padding={5}
-                                        y={5}
-                                    />
-                                </Group>
+                                {/* User Name Label (Text Only) */}
+                                <Text
+                                    text={cursor.username || cursor.id.slice(0, 8)}
+                                    fontSize={14}
+                                    fill={cursor.color}
+                                    fontStyle="bold"
+                                    x={25}
+                                    y={6}
+                                    align="left"
+                                    verticalAlign="middle"
+                                    shadowColor="white"
+                                    shadowBlur={0}
+                                    shadowOffset={{ x: 1, y: 1 }}
+                                    shadowOpacity={1}
+                                />
                             </Group>
                         ))}
 
