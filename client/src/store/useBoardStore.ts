@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type Tool = 'select' | 'rectangle' | 'circle' | 'text' | 'sticky' | 'artboard' | 'hand' | 'image';
+export type Tool = 'select' | 'rectangle' | 'circle' | 'text' | 'sticky' | 'artboard' | 'hand' | 'image' | 'pen';
 
 export interface Shape {
     id: string;
@@ -17,6 +17,9 @@ export interface Shape {
     textDecoration?: string;
     align?: string;
     imageUrl?: string;
+    points?: number[]; // For freehand pen
+    stroke?: string;   // For pen
+    strokeWidth?: number; // For pen
 }
 
 export interface Cursor {
@@ -35,17 +38,23 @@ interface BoardStore {
     scale: number;
     position: { x: number; y: number };
     activeColor: string;
+    penWidth: number;
+    isDarkMode: boolean;
+    boardName: string;
 
     setTool: (tool: Tool) => void;
     setActiveColor: (color: string) => void;
     setShapes: (shapes: Shape[]) => void;
     addShape: (shape: Shape) => void;
     updateShape: (id: string, updates: Partial<Shape>) => void;
-    removeShape: (id: string) => void; // Added this line
+    removeShape: (id: string) => void;
     updateCursor: (id: string, cursor: Partial<Cursor>) => void;
     removeCursor: (id: string) => void;
     setSelectedIds: (ids: string[]) => void;
     setViewport: (scale: number, position: { x: number; y: number }) => void;
+    toggleDarkMode: () => void;
+    setBoardName: (name: string) => void;
+    setPenWidth: (width: number) => void;
 }
 
 export const useBoardStore = create<BoardStore>((set) => ({
@@ -56,6 +65,9 @@ export const useBoardStore = create<BoardStore>((set) => ({
     scale: 1,
     position: { x: 0, y: 0 },
     activeColor: '#fff9c4', // Default yellow
+    penWidth: 3,
+    isDarkMode: localStorage.getItem('theme') === 'dark',
+    boardName: 'Untitled Board',
 
     setTool: (tool) => set({ tool }),
     setActiveColor: (color) => set({ activeColor: color }),
@@ -68,7 +80,7 @@ export const useBoardStore = create<BoardStore>((set) => ({
     removeShape: (id) =>
         set((state) => ({
             shapes: state.shapes.filter((s) => s.id !== id),
-        })), // Added this block
+        })),
     updateCursor: (id, cursor) =>
         set((state) => ({
             cursors: {
@@ -84,4 +96,16 @@ export const useBoardStore = create<BoardStore>((set) => ({
         }),
     setSelectedIds: (ids) => set({ selectedIds: ids }),
     setViewport: (scale, position) => set({ scale, position }),
+    toggleDarkMode: () => set((state) => {
+        const next = !state.isDarkMode;
+        localStorage.setItem('theme', next ? 'dark' : 'light');
+        if (next) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+        return { isDarkMode: next };
+    }),
+    setBoardName: (name) => set({ boardName: name }),
+    setPenWidth: (width) => set({ penWidth: width }),
 }));

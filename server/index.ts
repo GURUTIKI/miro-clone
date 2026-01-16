@@ -58,6 +58,18 @@ const companies: Record<string, Company> = {
 };
 const boards: Record<string, Board> = {};
 
+// Update board name
+app.patch('/boards/:boardId', (req, res) => {
+  const { boardId } = req.params;
+  const { name } = req.body;
+  if (boards[boardId]) {
+    boards[boardId].name = name;
+    res.json({ success: true, name });
+  } else {
+    res.status(404).json({ error: 'Board not found' });
+  }
+});
+
 // Company endpoints
 app.post('/companies/login', (req, res) => {
   const { code } = req.body;
@@ -258,6 +270,14 @@ io.on('connection', (socket) => {
           boards[boardId].shapes[index] = updatedShape;
         }
         socket.to(boardId).emit('shape-updated', updatedShape);
+      }
+    });
+
+    // Handle board renamed
+    socket.on('board-renamed', (newName: string) => {
+      if (boards[boardId]) {
+        boards[boardId].name = newName;
+        socket.to(boardId).emit('board-renamed', newName);
       }
     });
 

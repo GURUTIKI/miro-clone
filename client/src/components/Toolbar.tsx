@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import React, { useRef } from 'react';
 import {
     MousePointer2,
     Type,
@@ -7,10 +7,15 @@ import {
     Circle,
     Square,
     Hand,
-    Image as ImageIcon
+    Image as ImageIcon,
+    Pencil,
+    Settings,
+    Sun,
+    Moon
 } from 'lucide-react';
 import { useBoardStore } from '../store/useBoardStore';
 import type { Tool, Shape } from '../store/useBoardStore';
+import { useParams } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 
 const tools: { id: Tool; icon: any; label: string }[] = [
@@ -19,13 +24,17 @@ const tools: { id: Tool; icon: any; label: string }[] = [
     { id: 'rectangle', icon: Square, label: 'Rectangle' },
     { id: 'circle', icon: Circle, label: 'Circle' },
     { id: 'text', icon: Type, label: 'Text' },
+    { id: 'pen', icon: Pencil, label: 'Pen' },
     { id: 'sticky', icon: StickyNote, label: 'Sticky Note' },
     { id: 'artboard', icon: Layout, label: 'Artboard' },
     { id: 'image', icon: ImageIcon, label: 'Image' },
 ];
 
-export const Toolbar: React.FC<{ emitAddShape: (shape: Shape) => void }> = ({ emitAddShape }) => {
-    const { tool, setTool, activeColor, setActiveColor, addShape, setSelectedIds } = useBoardStore();
+export const Toolbar: React.FC<{
+    emitAddShape: (shape: Shape) => void,
+    emitBoardRename: (newName: string) => void
+}> = ({ emitAddShape, emitBoardRename }) => {
+    const { tool, setTool, activeColor, setActiveColor, addShape, setSelectedIds, isDarkMode, toggleDarkMode, boardName, setBoardName } = useBoardStore();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const COLORS = ['#fff9c4', '#ffccbc', '#b3e5fc', '#c8e6c9', '#f8bbd0', '#d7ccc8'];
@@ -170,6 +179,123 @@ export const Toolbar: React.FC<{ emitAddShape: (shape: Shape) => void }> = ({ em
             {/* Also show text toolbar if we have selected a text item */}
             {tool === 'select' && (
                 <TextToolbar />
+            )}
+
+            {/* Pen Styling Toolbar */}
+            {tool === 'pen' && (
+                <PenToolbar />
+            )}
+
+            {/* Settings Menu */}
+            <div className="h-px bg-[var(--border-ui)] my-1"></div>
+            <SettingsMenu
+                isDarkMode={isDarkMode}
+                toggleDarkMode={toggleDarkMode}
+                boardName={boardName}
+                setBoardName={setBoardName}
+                emitBoardRename={emitBoardRename}
+            />
+        </div>
+    );
+};
+
+const PenToolbar = () => {
+    const { activeColor, setActiveColor, penWidth, setPenWidth } = useBoardStore();
+    const COLORS = ['#333333', '#EB5757', '#F2994A', '#F2C94C', '#219653', '#2F80ED', '#9B51E0'];
+
+    return (
+        <div className="absolute left-full top-0 ml-3 bg-[var(--bg-toolbar)] backdrop-blur-xl p-3 rounded-2xl shadow-[var(--shadow-ui)] border border-[var(--border-ui)] flex flex-col gap-3 w-max animate-fade-in z-[60]">
+            <p className="text-[10px] uppercase font-bold text-[var(--text-secondary)] tracking-wider">Pen Color</p>
+            <div className="grid grid-cols-4 gap-1.5">
+                {COLORS.map((color) => (
+                    <button
+                        key={color}
+                        className={`w-7 h-7 rounded-full border-2 transition-all hover:scale-110 active:scale-95 ${activeColor === color ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-transparent'}`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => setActiveColor(color)}
+                    />
+                ))}
+            </div>
+
+            <div className="h-px bg-[var(--border-ui)]"></div>
+
+            <p className="text-[10px] uppercase font-bold text-[var(--text-secondary)] tracking-wider">Thickness</p>
+            <div className="flex items-center gap-2">
+                <input
+                    type="range"
+                    min="1"
+                    max="20"
+                    value={penWidth}
+                    onChange={(e) => setPenWidth(parseInt(e.target.value))}
+                    className="w-24 accent-blue-600"
+                />
+                <span className="text-xs font-mono text-[var(--text-primary)] w-4">{penWidth}</span>
+            </div>
+        </div>
+    );
+};
+
+const SettingsMenu = ({ isDarkMode, toggleDarkMode, boardName, setBoardName, emitBoardRename }: any) => {
+    const [isOpen, setIsOpen] = React.useState(false);
+    const { boardId } = useParams<{ boardId: string }>();
+
+    const handleNameChange = async (e: React.FocusEvent<HTMLInputElement>) => {
+        const newName = e.target.value;
+        if (!newName || newName === boardName) return;
+
+        setBoardName(newName);
+        emitBoardRename(newName);
+
+        // Update on server
+        try {
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+            await fetch(`${API_URL}/boards/${boardId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newName })
+            });
+        } catch (err) {
+            console.error('Failed to update board name', err);
+        }
+    };
+
+    return (
+        <div className="relative">
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className={`p-3 rounded-xl transition-all duration-200 flex items-center justify-center group relative
+                    ${isOpen ? 'bg-gray-100 dark:bg-slate-800 text-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800'}`}
+                title="Settings"
+            >
+                <Settings size={20} className={isOpen ? 'rotate-90' : ''} />
+            </button>
+
+            {isOpen && (
+                <div className="absolute left-full bottom-0 ml-3 bg-[var(--bg-toolbar)] backdrop-blur-xl p-4 rounded-2xl shadow-[var(--shadow-ui)] border border-[var(--border-ui)] flex flex-col gap-4 w-64 animate-fade-in z-[70]">
+                    <div>
+                        <label className="text-[10px] uppercase font-bold text-[var(--text-secondary)] tracking-wider mb-2 block">Board Name</label>
+                        <input
+                            type="text"
+                            defaultValue={boardName}
+                            onBlur={handleNameChange}
+                            onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                            className="w-full p-2.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-ui)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                        />
+                    </div>
+
+                    <div className="h-px bg-[var(--border-ui)]"></div>
+
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-[var(--text-primary)]">Theme</span>
+                        <button
+                            onClick={toggleDarkMode}
+                            className="flex items-center gap-2 p-2 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-ui)] text-[var(--text-primary)] hover:bg-opacity-80 transition-all"
+                        >
+                            {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
+                            <span className="text-xs">{isDarkMode ? 'Light' : 'Dark'}</span>
+                        </button>
+                    </div>
+                </div>
             )}
         </div>
     );

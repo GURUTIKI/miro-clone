@@ -7,7 +7,7 @@ const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export const useSocket = (boardId: string) => {
     const socketRef = useRef<Socket | null>(null);
-    const { setShapes, addShape, removeCursor } = useBoardStore();
+    const { setShapes, addShape, removeCursor, setBoardName } = useBoardStore();
 
     const [socket, setSocket] = useState<Socket | null>(null);
 
@@ -47,6 +47,10 @@ export const useSocket = (boardId: string) => {
             removeCursor(userId);
         });
 
+        newSocket.on('board-renamed', (newName: string) => {
+            setBoardName(newName);
+        });
+
         return () => {
             newSocket.disconnect();
         };
@@ -70,11 +74,16 @@ export const useSocket = (boardId: string) => {
         }
     }, []);
 
+    const emitBoardRename = useCallback((newName: string) => {
+        socketRef.current?.emit('board-renamed', newName);
+    }, []);
+
     return {
         socket,
         emitAddShape,
         emitUpdateShape,
         emitRemoveShape,
         emitCursorMove,
+        emitBoardRename,
     };
 };

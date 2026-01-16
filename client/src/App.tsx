@@ -10,13 +10,13 @@ import { Login } from './components/Login';
 
 const BoardView: React.FC = () => {
   const { boardId } = useParams<{ boardId: string }>();
-  const { emitAddShape, emitUpdateShape, emitRemoveShape, emitCursorMove, socket } = useSocket(boardId || '');
+  const { emitAddShape, emitUpdateShape, emitRemoveShape, emitCursorMove, emitBoardRename, socket } = useSocket(boardId || '');
 
   if (!boardId) return <div>Invalid Board ID</div>;
 
   return (
     <div className="w-full h-screen overflow-hidden bg-gray-50 relative">
-      <Toolbar emitAddShape={emitAddShape} />
+      <Toolbar emitAddShape={emitAddShape} emitBoardRename={emitBoardRename} />
       <Canvas
         boardId={boardId}
         socket={socket}

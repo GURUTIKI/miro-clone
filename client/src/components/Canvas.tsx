@@ -1,5 +1,5 @@
 import React, { useRef, useLayoutEffect } from 'react';
-import { Stage, Layer, Rect, Circle, Text, Group, Transformer, Image as KonvaImage, Path } from 'react-konva';
+import { Stage, Layer, Rect, Circle, Text, Group, Transformer, Image as KonvaImage, Path, Line } from 'react-konva';
 import useImage from 'use-image';
 import { useBoardStore } from '../store/useBoardStore';
 import type { Shape } from '../store/useBoardStore';
@@ -142,7 +142,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         const fetchBoardName = async () => {
             try {
                 const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3001';
-                const res = await fetch(`${API_URL}/boards/${boardId}`);
+                const res = await fetch(`${API_URL} /boards/${boardId} `);
                 if (res.ok) {
                     const data = await res.json();
                     setBoardName(data.name);
@@ -237,40 +237,52 @@ export const Canvas: React.FC<CanvasProps> = ({
 
             const stage = stageRef.current;
             const sc = stage.scaleX();
-            const pos = stage.position();
-            const pointer = stage.getPointerPosition();
-            const x = (pointer.x - pos.x) / sc;
-            const y = (pointer.y - pos.y) / sc;
-
-            startPosRef.current = { x, y };
+            const pos = stage.getPointerPosition(); // Use getPointerPosition for drawing start
+            const x = (pos.x - stage.x()) / sc;
+            const y = (pos.y - stage.y()) / sc;
 
             const id = uuidv4();
             drawingShapeIdRef.current = id;
 
-            const newShape: Shape = {
-                id,
-                type: tool,
-                x,
-                y,
-                width: tool === 'text' ? 100 : 1, // Start text wider so it doesn't squash
-                height: tool === 'text' ? 30 : 1,
-                fill: tool === 'sticky' ? activeColor : (tool === 'artboard' ? '#ffffff' : (tool === 'text' ? '#000000' : '#e3f2fd')),
-                text: tool === 'text' ? '' : (tool === 'artboard' ? 'Artboard' : ''),
-                fontSize: tool === 'text' ? 24 : undefined,
-                fontFamily: tool === 'text' ? 'Inter' : undefined,
-                fontStyle: tool === 'text' ? 'normal' : undefined,
-                textDecoration: tool === 'text' ? 'none' : undefined,
-            };
+            if (['rectangle', 'circle', 'artboard', 'sticky', 'text', 'image'].includes(tool)) {
+                const newShape: Shape = {
+                    id,
+                    type: tool,
+                    x,
+                    y,
+                    width: 5,
+                    height: 5,
+                    fill: activeColor,
+                    ...(tool === 'text' ? { text: 'Type here', fontSize: 24 } : {}),
+                    ...(tool === 'sticky' ? { width: 150, height: 150 } : {}),
+                    ...(tool === 'artboard' ? { width: 400, height: 300, fill: 'white' } : {})
+                };
 
-            addShape(newShape);
-            // Don't emit yet, wait until mouse up to emit final shape? 
-            // Or emit now? Better emit now so others see it appearing
-            emitAddShape(newShape);
+                addShape(newShape);
+                emitAddShape(newShape);
+                drawingShapeIdRef.current = id;
+                startPosRef.current = { x, y };
+                setSelectedIds([id]);
+            } else if (tool === 'pen') {
+                const newShape: Shape = {
+                    id,
+                    type: 'pen',
+                    x: 0, // Pen tool coordinates are absolute within its points array
+                    y: 0,
+                    width: 0,
+                    height: 0,
+                    fill: 'transparent',
+                    points: [x, y],
+                    stroke: activeColor,
+                    strokeWidth: useBoardStore.getState().penWidth
+                };
 
-            // Auto-select immediately
-            setSelectedIds([id]);
-            // Removed setEditingId here to allow dragging to define size first. 
-            // setEditingId will be called in handleMouseUp.
+                addShape(newShape);
+                emitAddShape(newShape);
+                drawingShapeIdRef.current = id;
+                startPosRef.current = { x, y };
+                setSelectedIds([id]);
+            }
         }
     };
 
@@ -281,56 +293,52 @@ export const Canvas: React.FC<CanvasProps> = ({
         if (!pointer) return;
 
         const sc = stage.scaleX();
-        const pos = stage.position();
-        const x = (pointer.x - pos.x) / sc;
-        const y = (pointer.y - pos.y) / sc;
+        const pos = {
+            x: (pointer.x - stage.x()) / sc,
+            y: (pointer.y - stage.y()) / sc
+        };
 
-        emitCursorMove({ x, y, username });
+        emitCursorMove({ x: pos.x, y: pos.y, username });
 
         // Handle Box Selection
         if (tool === 'select' && !spacePressed && startPosRef.current && !drawingShapeIdRef.current) {
             const startX = startPosRef.current.x;
             const startY = startPosRef.current.y;
-            const width = x - startX;
-            const height = y - startY;
+            const width = pos.x - startX;
+            const height = pos.y - startY;
 
             setSelectionBox({ x: startX, y: startY, width, height });
             return;
         }
 
-        // Handle drawing resize
+        // Handle drawing resize or pen drawing
         if (drawingShapeIdRef.current && startPosRef.current) {
-            const startX = startPosRef.current.x;
-            const startY = startPosRef.current.y;
+            const shape = shapes.find(s => s.id === drawingShapeIdRef.current);
+            if (!shape) return;
 
-            let newX = startX;
-            let newY = startY;
-            let width = x - startX;
-            let height = y - startY;
+            if (shape.type === 'pen') {
+                const newPoints = [...(shape.points || []), pos.x, pos.y];
+                const updatedShape = { ...shape, points: newPoints };
+                updateShape(shape.id, updatedShape);
+                emitUpdateShape(updatedShape);
+            } else {
+                const startX = startPosRef.current.x;
+                const startY = startPosRef.current.y;
 
-            // Handle negative width/height (dragging left/up)
-            if (width < 0) {
-                newX = x;
-                width = Math.abs(width);
+                const width = pos.x - startX;
+                const height = pos.y - startY;
+
+                const updatedShape = {
+                    ...shape,
+                    x: width < 0 ? pos.x : startX,
+                    y: height < 0 ? pos.y : startY,
+                    width: Math.abs(width),
+                    height: Math.abs(height)
+                };
+
+                updateShape(shape.id, updatedShape);
+                emitUpdateShape(updatedShape);
             }
-            if (height < 0) {
-                newY = y;
-                height = Math.abs(height);
-            }
-
-            const updatedShape = {
-                ...shapes.find(s => s.id === drawingShapeIdRef.current)!,
-                x: newX,
-                y: newY,
-                width: Math.max(5, width), // Min size 5
-                height: Math.max(5, height)
-            };
-
-            // Update local store immediately for smooth drawing
-            updateShape(drawingShapeIdRef.current, updatedShape);
-
-            // Throttle emit? For now just emit, assuming websocket handles it ok
-            emitUpdateShape(updatedShape);
         }
     };
 
@@ -541,6 +549,19 @@ export const Canvas: React.FC<CanvasProps> = ({
             )
         }
 
+        if (shape.type === 'pen') {
+            return (
+                <Line
+                    points={shape.points || []}
+                    stroke={shape.stroke || '#000'}
+                    strokeWidth={shape.strokeWidth || 3}
+                    tension={0.5}
+                    lineCap="round"
+                    lineJoin="round"
+                />
+            );
+        }
+
         return null;
     };
 
@@ -549,8 +570,8 @@ export const Canvas: React.FC<CanvasProps> = ({
             <div
                 className="fixed inset-0 w-full h-full overflow-hidden canvas-grid"
                 style={{
-                    backgroundSize: `${20 * scale}px ${20 * scale}px`,
-                    backgroundPosition: `${position.x}px ${position.y}px`,
+                    backgroundSize: `${20 * scale}px ${20 * scale} px`,
+                    backgroundPosition: `${position.x}px ${position.y} px`,
                     cursor: tool === 'hand' || spacePressed ? 'grab' : (tool === 'select' ? 'default' : 'crosshair')
                 }}
             >
@@ -583,8 +604,8 @@ export const Canvas: React.FC<CanvasProps> = ({
                                 <Group
                                     key={shape.id}
                                     id={shape.id}
-                                    x={shape.x}
-                                    y={shape.y}
+                                    x={shape.type === 'pen' ? 0 : shape.x} // Pen tool handles its own coordinates
+                                    y={shape.type === 'pen' ? 0 : shape.y} // Pen tool handles its own coordinates
                                     draggable={(tool === 'select' && !spacePressed) || (tool === 'hand' && false)} // Only draggable in select mode
                                     onClick={(e) => handleShapeClick(shape.id, e)}
                                     onDragStart={() => {
@@ -743,14 +764,14 @@ export const Canvas: React.FC<CanvasProps> = ({
             {/* Top Bar Overlay */}
             <div className="fixed top-0 left-0 right-0 h-16 pointer-events-none z-50 flex items-center justify-between px-6 pt-3">
                 {/* Left: Branding & Board Info */}
-                <div className="pointer-events-auto flex items-center gap-3 bg-white/95 backdrop-blur-xl px-4 py-2.5 rounded-xl shadow-md border border-gray-200/50 hover:shadow-lg transition-shadow">
+                <div className="pointer-events-auto flex items-center gap-3 bg-[var(--bg-toolbar)] backdrop-blur-xl px-4 py-2.5 rounded-xl shadow-md border border-[var(--border-ui)] hover:shadow-lg transition-shadow">
                     <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-2 rounded-lg text-white font-bold text-xs tracking-tight shadow-sm">
                         WB
                     </div>
-                    <div className="h-5 w-px bg-gray-200"></div>
+                    <div className="h-5 w-px bg-[var(--border-ui)]"></div>
                     <div>
-                        <h1 className="font-semibold text-gray-900 text-sm leading-tight">{boardName || `Board ${boardId.slice(0, 8)}`}</h1>
-                        <p className="text-[10px] text-gray-500 font-medium">Saved just now</p>
+                        <h1 className="font-semibold text-[var(--text-primary)] text-sm leading-tight">{boardName || `Board ${boardId.slice(0, 8)} `}</h1>
+                        <p className="text-[10px] text-[var(--text-secondary)] font-medium">Saved just now</p>
                     </div>
                 </div>
 
@@ -782,12 +803,12 @@ export const Canvas: React.FC<CanvasProps> = ({
                     </div>
 
                     {/* Separator */}
-                    <div className="h-8 w-px bg-gray-200 mx-1"></div>
+                    <div className="h-8 w-px bg-[var(--border-ui)] mx-1"></div>
 
                     {/* Exit Board */}
                     <button
                         onClick={() => window.location.href = '/'}
-                        className="bg-white hover:bg-gray-50 text-gray-700 hover:text-gray-900 px-4 py-2.5 rounded-lg border border-gray-200 shadow-sm text-sm font-medium transition-all hover:border-gray-300 flex items-center gap-2"
+                        className="bg-[var(--bg-toolbar)] hover:bg-opacity-90 text-[var(--text-primary)] px-4 py-2.5 rounded-lg border border-[var(--border-ui)] shadow-sm text-sm font-medium transition-all hover:border-blue-500/50 flex items-center gap-2"
                         title="Exit Board"
                     >
                         <LogOut size={16} strokeWidth={2} />
@@ -797,9 +818,9 @@ export const Canvas: React.FC<CanvasProps> = ({
             </div>
 
             {/* Zoom Controls (Bottom Right) */}
-            <div className="fixed bottom-6 right-6 flex flex-col gap-2 pointer-events-auto shadow-lg bg-white rounded-lg p-1 border border-gray-100">
+            <div className="fixed bottom-6 right-6 flex flex-col gap-2 pointer-events-auto shadow-lg bg-[var(--bg-toolbar)] backdrop-blur-xl rounded-lg p-1 border border-[var(--border-ui)]">
                 <button
-                    className="p-2 hover:bg-gray-50 text-gray-700 rounded transition-colors"
+                    className="p-2 hover:bg-[var(--bg-canvas)] text-[var(--text-primary)] rounded transition-colors"
                     onClick={() => {
                         const newScale = scale * 1.2;
                         setViewport(newScale, position);
@@ -808,9 +829,9 @@ export const Canvas: React.FC<CanvasProps> = ({
                 >
                     <Plus size={20} />
                 </button>
-                <div className="h-px bg-gray-100 mx-2"></div>
+                <div className="h-px bg-[var(--border-ui)] mx-2"></div>
                 <button
-                    className="p-2 hover:bg-gray-50 text-gray-700 rounded transition-colors"
+                    className="p-2 hover:bg-[var(--bg-canvas)] text-[var(--text-primary)] rounded transition-colors"
                     onClick={() => {
                         const newScale = scale / 1.2;
                         setViewport(newScale, position);
@@ -876,6 +897,66 @@ export const Canvas: React.FC<CanvasProps> = ({
                     </div>
                 </div>
             )}
+            {/* UI Overlays */}
+            {selectedIds.length === 1 && (
+                <DimensionIndicator
+                    shape={shapes.find(s => s.id === selectedIds[0])}
+                    updateShape={updateShape}
+                    emitUpdateShape={emitUpdateShape}
+                />
+            )}
         </>
+    );
+};
+
+const DimensionIndicator = ({ shape, updateShape, emitUpdateShape }: any) => {
+    if (!shape || shape.type === 'pen' || shape.type === 'hand' || shape.type === 'select') return null;
+
+    const [localDimensions, setLocalDimensions] = React.useState({ width: shape.width, height: shape.height });
+
+    React.useEffect(() => {
+        setLocalDimensions({ width: Math.round(shape.width), height: Math.round(shape.height) });
+    }, [shape.width, shape.height]);
+
+    const handleCommit = (e: React.KeyboardEvent | React.FocusEvent) => {
+        const updates = {
+            width: Number((e.currentTarget as any).form?.width?.value) || localDimensions.width,
+            height: Number((e.currentTarget as any).form?.height?.value) || localDimensions.height
+        };
+        const updated = { ...shape, ...updates };
+        updateShape(shape.id, updated);
+        emitUpdateShape(updated);
+    };
+
+    return (
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-[var(--bg-toolbar)] backdrop-blur-xl p-2 rounded-2xl shadow-[var(--shadow-ui)] border border-[var(--border-ui)] flex items-center gap-3 animate-fade-in z-50">
+            <form className="flex items-center gap-2" onSubmit={(e) => e.preventDefault()}>
+                <div className="flex items-center gap-1.5 px-2">
+                    <span className="text-[10px] font-bold text-[var(--text-secondary)]">W</span>
+                    <input
+                        name="width"
+                        type="number"
+                        value={localDimensions.width}
+                        onChange={(e) => setLocalDimensions(prev => ({ ...prev, width: Number(e.target.value) }))}
+                        onBlur={handleCommit}
+                        onKeyDown={(e) => e.key === 'Enter' && handleCommit(e)}
+                        className="w-16 bg-transparent text-sm font-medium text-[var(--text-primary)] focus:outline-none"
+                    />
+                </div>
+                <div className="w-px h-4 bg-[var(--border-ui)]"></div>
+                <div className="flex items-center gap-1.5 px-2">
+                    <span className="text-[10px] font-bold text-[var(--text-secondary)]">H</span>
+                    <input
+                        name="height"
+                        type="number"
+                        value={localDimensions.height}
+                        onChange={(e) => setLocalDimensions(prev => ({ ...prev, height: Number(e.target.value) }))}
+                        onBlur={handleCommit}
+                        onKeyDown={(e) => e.key === 'Enter' && handleCommit(e)}
+                        className="w-16 bg-transparent text-sm font-medium text-[var(--text-primary)] focus:outline-none"
+                    />
+                </div>
+            </form>
+        </div>
     );
 };
