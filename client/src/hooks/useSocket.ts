@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useBoardStore } from '../store/useBoardStore';
 import type { Shape } from '../store/useBoardStore';
@@ -52,21 +52,23 @@ export const useSocket = (boardId: string) => {
         };
     }, [boardId]); // Removed store methods from dependency array to avoid reconnection loops if they change
 
-    const emitAddShape = (shape: Shape) => {
+    const emitAddShape = useCallback((shape: Shape) => {
         socketRef.current?.emit('shape-added', shape);
-    };
+    }, []);
 
-    const emitUpdateShape = (shape: Shape) => {
+    const emitUpdateShape = useCallback((shape: Shape) => {
         socketRef.current?.emit('shape-updated', shape);
-    };
+    }, []);
 
-    const emitRemoveShape = (id: string) => {
+    const emitRemoveShape = useCallback((id: string) => {
         socketRef.current?.emit('shape-removed', id);
-    };
+    }, []);
 
-    const emitCursorMove = (cursor: { x: number; y: number; username?: string }) => {
-        socketRef.current?.emit('cursor-move', cursor);
-    };
+    const emitCursorMove = useCallback((cursor: { x: number; y: number; username?: string }) => {
+        if (socketRef.current?.connected) { // Only emit cursor if connected to reduce noise
+            socketRef.current?.emit('cursor-move', cursor);
+        }
+    }, []);
 
     return {
         socket,

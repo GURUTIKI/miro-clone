@@ -156,15 +156,27 @@ export const Canvas: React.FC<{ boardId: string }> = ({ boardId }) => {
 
     React.useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.key === 'Backspace' || e.key === 'Delete') && selectedIds.length > 0 && !editingId) {
-                selectedIds.forEach(id => {
-                    removeShape(id);
-                    emitRemoveShape(id);
-                });
-                setSelectedIds([]);
+            // Delete / Backspace
+            if ((e.key === 'Backspace' || e.key === 'Delete')) {
+                // If editing text, do not delete shapes
+                if (editingId) return;
+
+                if (selectedIds.length > 0) {
+                    e.preventDefault(); // Prevent browser back navigation
+                    console.log('Deleting shapes:', selectedIds);
+                    selectedIds.forEach(id => {
+                        removeShape(id);
+                        emitRemoveShape(id);
+                    });
+                    setSelectedIds([]);
+                }
             }
+
+            // Space for Panning
             if (e.code === 'Space' && !editingId && tool !== 'text') {
-                setSpacePressed(true);
+                if (!spacePressed) {
+                    setSpacePressed(true);
+                }
             }
         };
 
