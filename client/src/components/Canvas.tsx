@@ -28,6 +28,7 @@ const InPlaceEditor: React.FC<{
     onBlur: () => void;
 }> = ({ shape, scale, position, onUpdate, onBlur }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const [localValue, setLocalValue] = React.useState(shape.text || '');
 
     const adjustHeight = () => {
         const textarea = textareaRef.current;
@@ -35,13 +36,21 @@ const InPlaceEditor: React.FC<{
             textarea.style.height = 'auto';
             const newHeight = textarea.scrollHeight;
             textarea.style.height = `${newHeight}px`;
-            onUpdate(textarea.value, newHeight / scale);
         }
     };
 
     useLayoutEffect(() => {
         adjustHeight();
-    }, [shape.text]);
+    }, [localValue]); // Adjust height when local text changes
+
+    const handleCommit = () => {
+        const textarea = textareaRef.current;
+        if (textarea) {
+            const height = textarea.scrollHeight;
+            onUpdate(localValue, height / scale);
+        }
+        onBlur();
+    };
 
     return (
         <textarea
@@ -63,20 +72,19 @@ const InPlaceEditor: React.FC<{
                 paddingLeft: shape.type === 'text' ? '0' : '10px',
                 paddingRight: shape.type === 'text' ? '0' : '10px',
             }}
-            value={shape.text || ''}
+            value={localValue}
             autoFocus
             onChange={(e) => {
-                const textarea = e.target;
-                textarea.style.height = 'auto';
-                const newHeight = textarea.scrollHeight;
-                textarea.style.height = `${newHeight}px`;
-                onUpdate(textarea.value, newHeight / scale);
+                setLocalValue(e.target.value);
+                // Height adjustment handled by useLayoutEffect via dependency
             }}
-            onBlur={onBlur}
+            onBlur={handleCommit}
             onKeyDown={(e) => {
+                // Stop propagation so backspace doesn't delete the shape
+                e.stopPropagation();
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    onBlur();
+                    handleCommit();
                 }
             }}
         />
