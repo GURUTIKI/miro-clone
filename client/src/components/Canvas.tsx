@@ -101,7 +101,7 @@ export const Canvas: React.FC<{ boardId: string }> = ({ boardId }) => {
     const [selectionBox, setSelectionBox] = React.useState<{ x: number, y: number, width: number, height: number } | null>(null);
 
     const { tool, setTool, shapes, cursors, addShape, updateShape, removeShape, selectedIds, setSelectedIds, scale, position, setViewport, activeColor } = useBoardStore();
-    const { emitAddShape, emitUpdateShape, emitCursorMove, emitRemoveShape } = useSocket(boardId);
+    const { emitAddShape, emitUpdateShape, emitCursorMove, emitRemoveShape, socket } = useSocket(boardId);
 
     // Check for saved username on mount
     React.useEffect(() => {
@@ -630,42 +630,41 @@ export const Canvas: React.FC<{ boardId: string }> = ({ boardId }) => {
                         })}
 
                         {/* Render multiplayer cursors */}
-                        {Object.values(cursors).map((cursor) => (
-                            <Group key={cursor.id} x={cursor.x + 10} y={cursor.y - 10}>
-                                {/* Cursor Pointer (Rounded Triangle) */}
-                                <Path
-                                    data="M12 4L4 20L20 20Z"
-                                    fill={cursor.color}
-                                    stroke="white"
-                                    strokeWidth={3}
-                                    lineJoin="round"
-                                    lineCap="round"
-                                    scaleX={1.2}
-                                    scaleY={1.2}
-                                    rotation={-30}
-                                    shadowColor="black"
-                                    shadowBlur={4}
-                                    shadowOpacity={0.2}
-                                    shadowOffset={{ x: 2, y: 2 }}
-                                />
+                        {Object.values(cursors)
+                            .filter(cursor => cursor.id !== socket?.id && cursor.id !== 'undefined') // Filter out self and invalid IDs
+                            .map((cursor) => (
+                                <Group key={cursor.id} x={cursor.x} y={cursor.y}>
+                                    {/* Cursor Pointer (Navigation Arrow matching local style) */}
+                                    <Path
+                                        data="M6 3L13 22L17 14L25 11L6 3Z"
+                                        fill={cursor.color}
+                                        stroke="white"
+                                        strokeWidth={2}
+                                        lineJoin="round"
+                                        lineCap="round"
+                                        shadowColor="black"
+                                        shadowBlur={4}
+                                        shadowOpacity={0.2}
+                                        shadowOffset={{ x: 2, y: 2 }}
+                                    />
 
-                                {/* User Name Label (Text Only) */}
-                                <Text
-                                    text={cursor.username || cursor.id.slice(0, 8)}
-                                    fontSize={14}
-                                    fill={cursor.color}
-                                    fontStyle="bold"
-                                    x={32}
-                                    y={6}
-                                    align="left"
-                                    verticalAlign="middle"
-                                    shadowColor="white"
-                                    shadowBlur={0}
-                                    shadowOffset={{ x: 1, y: 1 }}
-                                    shadowOpacity={1}
-                                />
-                            </Group>
-                        ))}
+                                    {/* User Name Label */}
+                                    <Text
+                                        text={cursor.username || cursor.id.slice(0, 8)}
+                                        fontSize={14}
+                                        fill={cursor.color}
+                                        fontStyle="bold"
+                                        x={28}
+                                        y={10}
+                                        align="left"
+                                        verticalAlign="middle"
+                                        shadowColor="white"
+                                        shadowBlur={0}
+                                        shadowOffset={{ x: 1, y: 1 }}
+                                        shadowOpacity={1}
+                                    />
+                                </Group>
+                            ))}
 
                         {/* Selection Box Render */}
                         {selectionBox && (

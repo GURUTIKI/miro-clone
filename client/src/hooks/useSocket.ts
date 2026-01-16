@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useBoardStore } from '../store/useBoardStore';
 import type { Shape } from '../store/useBoardStore';
@@ -7,47 +7,50 @@ const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export const useSocket = (boardId: string) => {
     const socketRef = useRef<Socket | null>(null);
-    const { setShapes, addShape, updateShape, updateCursor, removeCursor } = useBoardStore();
+    const { setShapes, addShape, removeCursor } = useBoardStore();
+
+    const [socket, setSocket] = useState<Socket | null>(null);
 
     useEffect(() => {
-        socketRef.current = io(SOCKET_URL, {
+        const newSocket = io(SOCKET_URL, {
             query: { boardId }
         });
 
-        const socket = socketRef.current;
+        socketRef.current = newSocket;
+        setSocket(newSocket);
 
-        socket.on('connect', () => {
+        newSocket.on('connect', () => {
             console.log('Connected to socket server');
         });
 
-        socket.on('init-state', (initialShapes: Shape[]) => {
+        newSocket.on('init-state', (initialShapes: Shape[]) => {
             setShapes(initialShapes);
         });
 
-        socket.on('shape-added', (shape: Shape) => {
+        newSocket.on('shape-added', (shape: Shape) => {
             addShape(shape);
         });
 
-        socket.on('shape-updated', (updatedShape: Shape) => {
+        newSocket.on('shape-updated', (updatedShape: Shape) => {
             useBoardStore.getState().updateShape(updatedShape.id, updatedShape);
         });
 
-        socket.on('shape-removed', (id: string) => {
+        newSocket.on('shape-removed', (id: string) => {
             useBoardStore.getState().removeShape(id);
         });
 
-        socket.on('cursor-move', (cursor: any) => {
+        newSocket.on('cursor-move', (cursor: any) => {
             useBoardStore.getState().updateCursor(cursor.id, cursor);
         });
 
-        socket.on('user-disconnected', (userId: string) => {
+        newSocket.on('user-disconnected', (userId: string) => {
             removeCursor(userId);
         });
 
         return () => {
-            socket.disconnect();
+            newSocket.disconnect();
         };
-    }, [setShapes, addShape, updateShape, updateCursor, removeCursor]);
+    }, [boardId]); // Removed store methods from dependency array to avoid reconnection loops if they change
 
     const emitAddShape = (shape: Shape) => {
         socketRef.current?.emit('shape-added', shape);
@@ -66,6 +69,7 @@ export const useSocket = (boardId: string) => {
     };
 
     return {
+        socket,
         emitAddShape,
         emitUpdateShape,
         emitRemoveShape,
